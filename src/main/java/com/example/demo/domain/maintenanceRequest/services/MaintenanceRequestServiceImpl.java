@@ -55,7 +55,6 @@ public class MaintenanceRequestServiceImpl implements MaintenanceRequestService{
         request.setEmail(requestDetails.getEmail());
         request.setAptNum(requestDetails.getAptNum());
         request.setDescription(requestDetails.getDescription());
-        request.setCreatedAt(requestDetails.getCreatedAt());
         return maintenanceRequestRepo.save(request);
     }
 
