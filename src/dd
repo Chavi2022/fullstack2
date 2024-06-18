@@ -1,80 +1,140 @@
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
+package net.jpchase.camiterms;
+
+import com.github.tomakehurst.wiremock.client.WireMock;
 import net.jpchase.camiterms.model.Pool;
+import net.jpchase.camiterms.service.PoolApiService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
-@Slf4j
-@Service
-public class PoolApiService {
-    private final RestTemplate restTemplate;
-    private static final String apiUrl = "add link";
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest
+@Import(WireMockConfig.class)
+class GaiaMigrationServiceApplicationTest {
 
     @Autowired
-    public PoolApiService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    private PoolApiService poolApiService;
+
+    @BeforeEach
+    void setUp() {
+        // Mock the external API response
+        stubFor(WireMock.get(urlEqualTo("/api/v2/products/app/pools"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\n" +
+                                "  \"regions\": [\n" +
+                                "    {\n" +
+                                "      \"region\": \"North America East\",\n" +
+                                "      \"pools\": [\n" +
+                                "        {\n" +
+                                "          \"dataCenterType\": \"Strategic\",\n" +
+                                "          \"instances\": [\n" +
+                                "            {\n" +
+                                "              \"env\": \"dev\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 100\n" +
+                                "              }\n" +
+                                "            },\n" +
+                                "            {\n" +
+                                "              \"env\": \"prod\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 200\n" +
+                                "              }\n" +
+                                "            }\n" +
+                                "          ]\n" +
+                                "        },\n" +
+                                "        {\n" +
+                                "          \"dataCenterType\": \"heritage\",\n" +
+                                "          \"instances\": [\n" +
+                                "            {\n" +
+                                "              \"env\": \"dev\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 50\n" +
+                                "              }\n" +
+                                "            },\n" +
+                                "            {\n" +
+                                "              \"env\": \"test\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 75\n" +
+                                "              }\n" +
+                                "            }\n" +
+                                "          ]\n" +
+                                "        }\n" +
+                                "      ]\n" +
+                                "    },\n" +
+                                "    {\n" +
+                                "      \"region\": \"Europe West\",\n" +
+                                "      \"pools\": [\n" +
+                                "        {\n" +
+                                "          \"dataCenterType\": \"Strategic\",\n" +
+                                "          \"instances\": [\n" +
+                                "            {\n" +
+                                "              \"env\": \"dev\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 300\n" +
+                                "              }\n" +
+                                "            },\n" +
+                                "            {\n" +
+                                "              \"env\": \"stage\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 150\n" +
+                                "              }\n" +
+                                "            }\n" +
+                                "          ]\n" +
+                                "        },\n" +
+                                "        {\n" +
+                                "          \"dataCenterType\": \"Strategic\",\n" +
+                                "          \"instances\": [\n" +
+                                "            {\n" +
+                                "              \"env\": \"prod\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 400\n" +
+                                "              }\n" +
+                                "            },\n" +
+                                "            {\n" +
+                                "              \"env\": \"dev\",\n" +
+                                "              \"capacity\": {\n" +
+                                "                \"available\": 250\n" +
+                                "              }\n" +
+                                "            }\n" +
+                                "          ]\n" +
+                                "        }\n" +
+                                "      ]\n" +
+                                "    }\n" +
+                                "  ]\n" +
+                                "}")));
     }
 
-    public List<Pool> getFilteredPools() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Accept", "application/json, text/plain, */*");
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, JsonNode.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode responseBody = response.getBody();
-                return processResponse(responseBody.get("regions"));
-            } else {
-                log.error("Failed to get pool info: " + response.getStatusCode());
-                return new ArrayList<>();
-            }
-        } catch (Exception e) {
-            log.error("Error getting the pool: ", e);
-            return new ArrayList<>();
-        }
+    @Test
+    void contextLoads() {
     }
 
-    private List<Pool> processResponse(JsonNode regionsNode) {
-        ObjectMapper objectMapper = new ObjectMapper();
-        List<Pool> poolList = new ArrayList<>();
+    @Test
+    void testGetFilteredPools() {
+        List<Pool> filteredPools = poolApiService.getFilteredPools();
+        assertThat(filteredPools).isNotNull();
+        assertThat(filteredPools).hasSize(2);
 
-        try {
-            for (JsonNode regionNode : regionsNode) {
-                for (JsonNode poolNode : regionNode.get("pools")) {
-                    Pool pool = objectMapper.treeToValue(poolNode, Pool.class);
-                    if ("Strategic".equals(pool.getDataCenterType())) {
-                        List<Pool.Instance> filteredInstances = new ArrayList<>();
-                        for (Pool.Instance instance : pool.getInstances()) {
-                            if ("dev".equals(instance.getEnv())) {
-                                filteredInstances.add(instance);
-                            }
-                        }
-                        // Only add pools that have matching criteria
-                        if (!filteredInstances.isEmpty()) {
-                            // Sort instances by availability in descending order
-                            filteredInstances.sort(Comparator.comparingInt((Pool.Instance instance) -> instance.getCapacity().getAvailable()).reversed());
-                            pool.setInstances(filteredInstances);
-                            poolList.add(pool);
-                        }
-                    }
-                }
-            }
-            // Sort pools by the highest availability instance in descending order
-            poolList.sort(Comparator.comparingInt((Pool pool) -> pool.getInstances().get(0).getCapacity().getAvailable()).reversed());
-        } catch (Exception e) {
-            log.error("Error processing JSON response: ", e);
-        }
-        return poolList;
+        Pool firstPool = filteredPools.get(0);
+        assertThat(firstPool.getInstances()).hasSize(1);
+        assertThat(firstPool.getInstances().get(0).getEnv()).isEqualTo("dev");
+        assertThat(firstPool.getInstances().get(0).getCapacity().getAvailable()).isEqualTo(300);
+
+        Pool secondPool = filteredPools.get(1);
+        assertThat(secondPool.getInstances()).hasSize(1);
+        assertThat(secondPool.getInstances().get(0).getEnv()).isEqualTo("dev");
+        assertThat(secondPool.getInstances().get(0).getCapacity().getAvailable()).isEqualTo(250);
     }
 }
