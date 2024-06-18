@@ -1,0 +1,80 @@
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import net.jpchase.camiterms.model.Pool;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+@Slf4j
+@Service
+public class PoolApiService {
+    private final RestTemplate restTemplate;
+    private static final String apiUrl = "add link";
+
+    @Autowired
+    public PoolApiService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    public List<Pool> getFilteredPools() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Accept", "application/json, text/plain, */*");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, JsonNode.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode responseBody = response.getBody();
+                return processResponse(responseBody.get("regions"));
+            } else {
+                log.error("Failed to get pool info: " + response.getStatusCode());
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            log.error("Error getting the pool: ", e);
+            return new ArrayList<>();
+        }
+    }
+
+    private List<Pool> processResponse(JsonNode regionsNode) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<Pool> poolList = new ArrayList<>();
+
+        try {
+            for (JsonNode regionNode : regionsNode) {
+                for (JsonNode poolNode : regionNode.get("pools")) {
+                    Pool pool = objectMapper.treeToValue(poolNode, Pool.class);
+                    if ("Strategic".equals(pool.getDataCenterType())) {
+                        List<Pool.Instance> filteredInstances = new ArrayList<>();
+                        for (Pool.Instance instance : pool.getInstances()) {
+                            if ("dev".equals(instance.getEnv())) {
+                                filteredInstances.add(instance);
+                            }
+                        }
+                        // Only add pools that have matching criteria
+                        if (!filteredInstances.isEmpty()) {
+                            // Sort instances by availability in descending order
+                            filteredInstances.sort(Comparator.comparingInt((Pool.Instance instance) -> instance.getCapacity().getAvailable()).reversed());
+                            pool.setInstances(filteredInstances);
+                            poolList.add(pool);
+                        }
+                    }
+                }
+            }
+            // Sort pools by the highest availability instance in descending order
+            poolList.sort(Comparator.comparingInt((Pool pool) -> pool.getInstances().get(0).getCapacity().getAvailable()).reversed());
+        } catch (Exception e) {
+            log.error("Error processing JSON response: ", e);
+        }
+        return poolList;
+    }
+}
