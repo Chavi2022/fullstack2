@@ -1,12 +1,13 @@
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.jpmchase.caminterns.model.Pool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -18,8 +19,8 @@ import java.util.List;
 public class PoolApiService {
 
     private final RestTemplate restTemplate;
-    private static final Logger log = LoggerFactory.getLogger(PoolApiService.class);
-    private final String apiUrl = "https://gaia-status-api.gaia.cloud.jpmchase.net/api/v2/products/app/pools";
+    private final Logger log = LoggerFactory.getLogger(PoolApiService.class);
+    private final String apiUrl = "http://pile-status-api-puliced.jpmchase.net/api/v2/products/app/pools";
 
     @Autowired
     public PoolApiService(RestTemplate restTemplate) {
@@ -30,10 +31,8 @@ public class PoolApiService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Accept", "application/json, text/plain, */*");
         HttpEntity<String> entity = new HttpEntity<>(headers);
-
         try {
             ResponseEntity<JsonNode> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, JsonNode.class);
-
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode responseBody = response.getBody();
                 List<Pool> filteredPools = processResponse(responseBody.get("regions"));
@@ -43,57 +42,60 @@ public class PoolApiService {
                 return ResponseEntity.status(response.getStatusCode()).build();
             }
         } catch (Exception e) {
-            log.error("Error getting the pool: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error retrieving the pool: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     private List<Pool> processResponse(JsonNode regionsNode) {
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            List<Pool> filteredPools = new ArrayList<>();
-
-            for (JsonNode regionNode : regionsNode) {
-                for (JsonNode poolNode : regionNode.get("pools")) {
-                    Pool pool = objectMapper.treeToValue(poolNode, Pool.class);
-                    if ("Strategic".equals(pool.getDataCenterType())) {
-                        boolean hasDevInstance = pool.getInstances().stream()
-                                .anyMatch(instance -> "dev".equals(instance.getEnv()));
-                        if (hasDevInstance) {
-                            filteredPools.add(pool);
+        List<Pool> filteredPools = new ArrayList<>();
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (JsonNode regionNode : regionsNode) {
+            for (JsonNode poolNode : regionNode.get("pools")) {
+                if ("Strategic".equals(poolNode.get("dataCenterType").asText())) {
+                    boolean hasDevInstance = false;
+                    for (JsonNode instanceNode : poolNode.get("instances")) {
+                        if ("dev".equals(instanceNode.get("env").asText())) {
+                            hasDevInstance = true;
+                            break;
                         }
+                    }
+                    if (hasDevInstance) {
+                        Pool pool = objectMapper.convertValue(poolNode, Pool.class);
+                        filteredPools.add(pool);
                     }
                 }
             }
-
-            filteredPools.sort((p1, p2) -> {
-                int available1 = p1.getInstances().stream().mapToInt(instance -> instance.getCapacity().getAvailable()).sum();
-                int available2 = p2.getInstances().stream().mapToInt(instance -> instance.getCapacity().getAvailable()).sum();
-                return Integer.compare(available2, available1); // sort descending
-            });
-
-            return filteredPools;
-        } catch (Exception e) {
-            log.error("Error processing pools data: " + e.getMessage());
-            e.printStackTrace();
-            return new ArrayList<>();
         }
+        filteredPools.sort((p1, p2) -> {
+            int available1 = p1.getInstances().stream()
+                    .mapToInt(instance -> instance.getCapacity().getAvailable())
+                    .sum();
+            int available2 = p2.getInstances().stream()
+                    .mapToInt(instance -> instance.getCapacity().getAvailable())
+                    .sum();
+            return Integer.compare(available2, available1); // sort in descending order
+        });
+        return filteredPools;
     }
 }
-Pool.java:
+Pool.java
+Ensure your Pool model class contains nested classes for Instance and Capacity:
+
 java
 Copy code
 package net.jpmchase.caminterns.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+
 import java.util.List;
 
 @Data
 public class Pool {
     @JsonProperty("pool")
     private String poolName;
+    @JsonProperty("dataCenterType")
     private String dataCenterType;
     private List<Instance> instances;
 
@@ -106,33 +108,5 @@ public class Pool {
         public static class Capacity {
             private int available;
         }
-    }
-}
-GaiaMigrationServiceController.java:
-java
-Copy code
-package net.jpmchase.caminterns.controller;
-
-import net.jpmchase.caminterns.model.Pool;
-import net.jpmchase.caminterns.service.PoolApiService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.http.ResponseEntity;
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/pools")
-public class GaiaMigrationServiceController {
-
-    private final PoolApiService poolApiService;
-
-    public GaiaMigrationServiceController(PoolApiService poolApiService) {
-        this.poolApiService = poolApiService;
-    }
-
-    @GetMapping(value = "/getFilteredPoolInfo", produces = "application/json")
-    public ResponseEntity<List<Pool>> getFilteredPools() {
-        return poolApiService.getFilteredPoolRepos();
     }
 }
