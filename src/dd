@@ -1,3 +1,28 @@
+package com.example.yourapp.service;
+
+import com.example.yourapp.model.Pool;
+import com.example.yourapp.model.PoolsData;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.stereotype.Service;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@Log4j2
+public class PoolService {
+
+    private final PoolApiService poolApiService;
+    private final ObjectMapper objectMapper;
+
+    public PoolService(PoolApiService poolApiService, ObjectMapper objectMapper) {
+        this.poolApiService = poolApiService;
+        this.objectMapper = objectMapper;
+    }
+
     public List<Pool> getFilteredPoolRepos() {
         JsonNode poolApiResponse = poolApiService.getPoolInfo();
         if (poolApiResponse != null) {
