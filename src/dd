@@ -1,0 +1,68 @@
+package com.example.yourapp.service;
+
+import com.example.yourapp.model.Pool;
+import com.example.yourapp.model.PoolsData;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+@Service
+@Log4j2
+public class PoolService {
+
+    private final PoolApiService poolApiService;
+    private final ObjectMapper objectMapper;
+
+    public PoolService(PoolApiService poolApiService, ObjectMapper objectMapper) {
+        this.poolApiService = poolApiService;
+        this.objectMapper = objectMapper;
+    }
+
+    public List<Pool> getFilteredPoolRepos() {
+        JsonNode poolApiResponse = poolApiService.getPoolInfo();
+        if (poolApiResponse != null) {
+            try {
+                PoolsData poolsData = objectMapper.treeToValue(poolApiResponse, PoolsData.class);
+                return processPoolsData(poolsData);
+            } catch (Exception e) {
+                log.error("Failed to parse the API response", e);
+            }
+        } else {
+            log.error("Received null response from PoolApiService");
+        }
+        return List.of();
+    }
+
+    private List<Pool> processPoolsData(PoolsData poolsData) {
+        List<Pool> filteredPools = new ArrayList<>();
+
+        for (PoolsData.Region region : poolsData.getRegions()) {
+            for (Pool pool : region.getPools()) {
+                if ("Strategic".equals(pool.getDataCenterType())) {
+                    boolean hasDevInstance = pool.getInstances().stream()
+                            .anyMatch(instance -> "dev".equals(instance.getEnv()));
+                    if (hasDevInstance) {
+                        filteredPools.add(pool);
+                    }
+                }
+            }
+        }
+
+        filteredPools.sort((pool1, pool2) -> {
+            int available1 = pool1.getInstances().stream()
+                    .mapToInt(instance -> instance.getCapacity().getAvailable())
+                    .sum();
+            int available2 = pool2.getInstances().stream()
+                    .mapToInt(instance -> instance.getCapacity().getAvailable())
+                    .sum();
+            return Integer.compare(available2, available1); // sort descending
+        });
+
+        return filteredPools;
+    }
+}
