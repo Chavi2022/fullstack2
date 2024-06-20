@@ -1,0 +1,26 @@
+    public List<Pool> getFilteredPoolRepos() {
+        JsonNode poolApiResponse = poolApiService.getPoolInfo();
+        if (poolApiResponse != null) {
+            try {
+                PoolsData poolsData = objectMapper.treeToValue(poolApiResponse, PoolsData.class);
+                return processPoolsData(poolsData);
+            } catch (Exception e) {
+                log.error("Failed to parse the API response", e);
+            }
+        } else {
+            log.error("Received null response from PoolApiService");
+        }
+        return List.of();
+    }
+
+    private List<Pool> processPoolsData(PoolsData poolsData) {
+        return poolsData.getRegions().stream()
+                .flatMap(region -> region.getPools().stream())
+                .filter(pool -> "Strategic".equals(pool.getDataCenterType()))
+                .filter(pool -> pool.getInstances().stream().anyMatch(instance -> "dev".equals(instance.getEnv())))
+                .sorted(Comparator.comparingInt(pool -> pool.getInstances().stream()
+                        .mapToInt(instance -> instance.getCapacity().getAvailable())
+                        .sum()).reversed())
+                .collect(Collectors.toList());
+    }
+}
