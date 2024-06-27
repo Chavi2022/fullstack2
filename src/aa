@@ -1,37 +1,84 @@
-private List<Pool> processResponse(JsonNode regionsNode) {
-    List<Pool> filteredPools = new ArrayList<>();
-    
-    for (JsonNode regionNode : regionsNode) {
-        String region = regionNode.get("region").asText();
-        
-        for (JsonNode poolNode : regionNode.get("pools")) {
-            if ("strategic".equals(poolNode.get("dataCenterType").asText())) {
-                
-                for (JsonNode instanceNode : poolNode.get("instances")) {
-                    if ("dev".equals(instanceNode.get("env").asText())) {
-                        
-                        Pool pool = new Pool();
-                        pool.setRegion(region);
-                        pool.setPoolName(poolNode.get("pool").asText());
-                        pool.setDataCenterType(poolNode.get("dataCenterType").asText());
-                        
-                        Pool.Instance instance = new Pool.Instance();
-                        instance.setEnv(instanceNode.get("env").asText());
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
 
-                        Pool.Instance.Capacity capacity = new Pool.Instance.Capacity();
-                        capacity.setAvailable(instanceNode.get("capacity").get("available").asInt());
-                        capacity.setMaxSlice(instanceNode.get("capacity").get("maxSlice").asInt());
-                        instance.setCapacity(capacity);
+import java.io.IOException;
+import java.util.List;
 
-                        List<Pool.Instance> instances = new ArrayList<>();
-                        instances.add(instance);
-                        pool.setInstances(instances);
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
-                        filteredPools.add(pool);
-                    }
-                }
-            }
-        }
+public class PoolApiServiceTest {
+
+    @Mock
+    private RestTemplate restTemplate;
+
+    @InjectMocks
+    private PoolApiService poolApiService;
+
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @BeforeEach
+    public void setUp() {
+        MockitoAnnotations.openMocks(this);
     }
-    return filteredPools;
+
+    @Test
+    public void testGetFilteredPoolRepos() throws IOException {
+        // Arrange
+        Resource resource = new ClassPathResource("data.json");
+        JsonNode regionsNode = objectMapper.readTree(resource.getInputStream()).get("regions");
+
+        // Mocking the behavior of reading the JSON file
+        ObjectMapper objectMapperSpy = spy(ObjectMapper.class);
+        doReturn(regionsNode).when(objectMapperSpy).readTree(any(Resource.class).getInputStream());
+
+        // Inject the mock into the service
+        PoolApiService poolApiServiceSpy = spy(new PoolApiService(restTemplate, objectMapperSpy));
+
+        // Act
+        ResponseEntity<List<Pool>> response = poolApiServiceSpy.getFilteredPoolRepos();
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        List<Pool> poolList = response.getBody();
+        assertNotNull(poolList);
+        // Change this according to the expected number of filtered items
+        // assertEquals(1, poolList.size());
+
+        // Verify that postServiceToApi is called
+        verify(poolApiServiceSpy, times(1)).postServiceToApi(any(Pool.class));
+    }
+
+    @Test
+    public void testPostServiceToApi() {
+        // Arrange
+        Pool pool = new Pool();
+        pool.setPoolName("cassandra");
+
+        HttpStatus expectedStatus = HttpStatus.OK;
+        ResponseEntity<String> expectedResponse = new ResponseEntity<>(expectedStatus);
+        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class))).thenReturn(expectedResponse);
+
+        // Act
+        poolApiService.postServiceToApi(pool);
+
+        // Assert
+        verify(restTemplate, times(1)).postForEntity(anyString(), any(HttpEntity.class), eq(String.class));
+    }
 }
