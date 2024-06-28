@@ -19,15 +19,16 @@ class PoolApiServiceTest {
     private RestTemplate restTemplate;
 
     private PoolApiService poolApiService;
+    private AutoCloseable mocks;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        mocks = MockitoAnnotations.openMocks(this);
         poolApiService = new PoolApiService(restTemplate);
     }
 
     @Test
-    void testGetFilteredPools() {
+    void testGetFilteredPoolData() {
         // Prepare test data
         String mockResponse = "{\"regions\": [{\"region\": \"North America East\", \"pools\": [{\"pool\": \"na-1y\", \"datacenter\": \"Ashburn\", \"dataCenterType\": \"strategic\", \"instances\": [{\"env\": \"dev\", \"capacity\": {\"available\": 10, \"maxSlice\": 5}}]}]}]}";
         
@@ -40,7 +41,7 @@ class PoolApiServiceTest {
         )).thenReturn(new ResponseEntity<>(mockResponse, HttpStatus.OK));
 
         // Call the method
-        ResponseEntity<List<Pool>> result = poolApiService.getFilteredPools();
+        ResponseEntity<List<Pool>> result = poolApiService.getFilteredPoolData();
 
         // Verify the result
         assertNotNull(result);
@@ -55,7 +56,7 @@ class PoolApiServiceTest {
     }
 
     @Test
-    void testGetFilteredPoolsWithException() {
+    void testGetFilteredPoolDataWithException() {
         // Mock the REST call to throw an exception
         when(restTemplate.exchange(
             anyString(),
@@ -65,10 +66,15 @@ class PoolApiServiceTest {
         )).thenThrow(new RestClientException("Test exception"));
 
         // Call the method
-        ResponseEntity<List<Pool>> result = poolApiService.getFilteredPools();
+        ResponseEntity<List<Pool>> result = poolApiService.getFilteredPoolData();
 
         // Verify the result
         assertNotNull(result);
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        mocks.close();
     }
 }
