@@ -1,0 +1,104 @@
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class PoolApiServiceTest {
+
+    @Mock
+    private RestTemplate restTemplate;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
+    private PoolApiService poolApiService;
+    private AutoCloseable mocks;
+
+    @BeforeEach
+    void setUp() {
+        mocks = MockitoAnnotations.openMocks(this);
+        poolApiService = new PoolApiService(restTemplate, objectMapper);
+    }
+
+    @Test
+    void testGetFilteredPoolRepos() throws Exception {
+        // Prepare test data
+        String mockResponse = "{\"regions\": [{\"region\": \"North America East\", \"pools\": [{\"pool\": \"na-1y\", \"datacenter\": \"Ashburn\", \"dataCenterType\": \"strategic\", \"instances\": [{\"env\": \"dev\", \"capacity\": {\"available\": 10, \"maxSlice\": 5}}]}]}]}";
+        JsonNode mockJsonNode = objectMapper.readTree(mockResponse);
+
+        // Mock the REST call
+        when(restTemplate.exchange(
+                anyString(),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(JsonNode.class)
+        )).thenReturn(new ResponseEntity<>(mockJsonNode, HttpStatus.OK));
+
+        // Mock the ObjectMapper behavior
+        when(objectMapper.treeToValue(any(JsonNode.class), eq(Pool.class))).thenAnswer(invocation -> {
+            JsonNode node = invocation.getArgument(0);
+            return new Pool(node.get("pool").asText(), node.get("region").asText(), node.get("dataCenterType").asText(), null);
+        });
+
+        when(objectMapper.treeToValue(any(JsonNode.class), eq(Pool.Instance.class))).thenAnswer(invocation -> {
+            JsonNode node = invocation.getArgument(0);
+            return new Pool.Instance(node.get("env").asText(), null);
+        });
+
+        // Call the method
+        ResponseEntity<List<Pool>> result = poolApiService.getFilteredPoolRepos();
+
+        // Verify the result
+        assertNotNull(result);
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        List<Pool> pools = result.getBody();
+        assertNotNull(pools);
+        assertEquals(1, pools.size());
+        Pool pool = pools.get(0);
+        assertEquals("na-1y", pool.getPoolName());
+        assertEquals("North America East", pool.getRegion());
+        assertEquals("strategic", pool.getDataCenterType());
+        assertNotNull(pool.getInstances());
+        assertEquals(1, pool.getInstances().size());
+        Pool.Instance instance = pool.getInstances().get(0);
+        assertEquals("dev", instance.getEnv());
+    }
+
+    @Test
+    void testGetFilteredPoolReposWithException() {
+        // Mock the REST call to throw an exception
+        when(restTemplate.exchange(
+                anyString(),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(JsonNode.class)
+        )).thenThrow(new RestClientException("Test exception"));
+
+        // Call the method
+        ResponseEntity<List<Pool>> result = poolApiService.getFilteredPoolRepos();
+
+        // Verify the result
+        assertNotNull(result);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        mocks.close();
+    }
+}
