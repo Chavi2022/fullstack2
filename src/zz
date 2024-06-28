@@ -1,0 +1,83 @@
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
+import java.util.logging.Logger;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class PoolDataServiceTest {
+
+    @Mock
+    private RestTemplate restTemplate;
+
+    @Mock
+    private Logger log;
+
+    private PoolDataService poolDataService;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        poolDataService = new PoolDataService(restTemplate);
+        poolDataService.log = log;
+    }
+
+    @Test
+    void testGetFilteredPools() {
+        // Prepare test data
+        String mockResponse = "{\"regions\": [{\"region\": \"North America East\", \"pools\": [{\"pool\": \"na-1y\", \"datacenter\": \"Ashburn\"}]}]}";
+        
+        // Mock the REST call
+        when(restTemplate.exchange(
+            anyString(),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)
+        )).thenReturn(new ResponseEntity<>(mockResponse, HttpStatus.OK));
+
+        // Call the method
+        Map<String, Object> result = poolDataService.getFilteredPools();
+
+        // Verify the result
+        assertNotNull(result);
+        assertTrue(result.containsKey("regions"));
+        
+        // Add more specific assertions based on the expected structure of the result
+
+        // Verify that the log messages were called
+        verify(log).info(contains("Received request to get filtered pools"));
+        verify(log).info(contains("Returning filtered pool information"));
+    }
+
+    @Test
+    void testGetFilteredPoolsWithException() {
+        // Mock the REST call to throw an exception
+        when(restTemplate.exchange(
+            anyString(),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)
+        )).thenThrow(new RestClientException("Test exception"));
+
+        // Call the method
+        Map<String, Object> result = poolDataService.getFilteredPools();
+
+        // Verify the result
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        // Verify that the error log was called
+        verify(log).error(contains("Error processing response:"), any(RestClientException.class));
+    }
+}
