@@ -97,14 +97,6 @@ public class PoolApiService {
             capacity.setTotal(instanceNode.get("capacity").get("total").asInt());
             instance.setCapacity(capacity);
 
-            // Set CFC capacity details for the instance
-            Pool.Instance.Capacity cfcCapacity = new Pool.Instance.Capacity();
-            cfcCapacity.setAvailable(instanceNode.get("cfcCapacity").get("available").asInt());
-            cfcCapacity.setUsed(instanceNode.get("cfcCapacity").get("used").asInt());
-            cfcCapacity.setTotal(instanceNode.get("cfcCapacity").get("total").asInt());
-            cfcCapacity.setMaxSlice(instanceNode.get("cfcCapacity").get("max_slice").asInt());
-            instance.setCfcCapacity(cfcCapacity);
-
             // Set next repave details for the instance if available
             if (instanceNode.has("repave") && instanceNode.get("repave").has("nextRepave")) {
                 instance.setNextRepave(instanceNode.get("repave").get("nextRepave").asText());
@@ -121,4 +113,3 @@ public class PoolApiService {
         return pool;
     }
 }
-
