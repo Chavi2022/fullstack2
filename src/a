@@ -1,262 +1,77 @@
-
-const PoolTable: React.FC = () => {
-  const [pools, setPools] = useState<Pool[]>([]);
-  const [selectedPools, setSelectedPools] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState<'avgCpu' | 'available' | null>(null);
-  const [sortDesc, setSortDesc] = useState(true);
-  const [showDialog, setShowDialog] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setIsLoading(true);
-    getFilteredPoolInfo()
-      .then(response => {
-        setPools(response.data);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setError('Failed to fetch pool data');
-        setIsLoading(false);
-      });
-  }, []);
-
-  const sortPools = (key: 'avgCpu' | 'available') => {
-    const desc = sortKey === key ? !sortDesc : true;
-    const sortedPools = [...pools].sort((a, b) => {
-      const aValue = key === 'available' ? a.instances[0]?.capacity.available ?? 0 : a[key];
-      const bValue = key === 'available' ? b.instances[0]?.capacity.available ?? 0 : b[key];
-      return desc ? bValue - aValue : aValue - bValue;
-    });
-    setPools(sortedPools);
-    setSortKey(key);
-    setSortDesc(desc);
-  };
-
-  const togglePoolSelection = (poolName: string) => {
-    setSelectedPools(prev => 
-      prev.includes(poolName) ? prev.filter(p => p !== poolName) : [...prev, poolName]
-    );
-  };
-
-  const SortButton = ({ column }: { column: 'avgCpu' | 'available' }) => (
-    <button onClick={() => sortPools(column)} className={tableStyles.sortButton}>
-      {column === 'avgCpu' ? 'Avg CPU' : 'Available'} {sortKey === column && (sortDesc ? '▼' : '▲')}
-    </button>
-  );
-
-  const handleContinue = () => {
-    console.log("Continuing with selected pools:", selectedPools);
-    setShowDialog(false);
-  };
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
-  return (
-    <div className={tableStyles.container}>
-      <table className={tableStyles.table}>
-        <thead>
-          <tr>
-            <th className={tableStyles.th}>Region</th>
-            <th className={tableStyles.th}>Pool</th>
-            <th className={tableStyles.th}>Data Center Type</th>
-            <th className={tableStyles.th}><SortButton column="avgCpu" /></th>
-            <th className={tableStyles.th}>Max Slice</th>
-            <th className={tableStyles.th}>Next Repave</th>
-            <th className={tableStyles.th}><SortButton column="available" /></th>
-            <th className={tableStyles.th}>Select</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pools.map(pool => (
-            <tr key={pool.pool}>
-              <td className={tableStyles.td}>{pool.region}</td>
-              <td className={tableStyles.td}>{pool.pool}</td>
-              <td className={tableStyles.td}>{pool.dataCenterType}</td>
-              <td className={tableStyles.td}>{roundCpu(pool.avgCpu)}</td>
-              <td className={tableStyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
-              <td className={tableStyles.td}>{pool.instances[0].nextRepave}</td>
-              <td className={tableStyles.td}>{pool.instances[0].capacity.available}</td>
-              <td className={`${tableStyles.td} ${tableStyles.checkboxCell}`}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={selectedPools.includes(pool.pool)}
-                    onChange={() => togglePoolSelection(pool.pool)}
-                  />
-                  <span className={tableStyles.visuallyHidden}>Select {pool.pool}</span>
-                </label>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <button onClick={() => setShowDialog(true)} className={tableStyles.showSelectedButton}>
-        Show Selected Pools
-      </button>
-      {showDialog && (
-        <div className={dialogStyles.overlay}>
-          <div className={dialogStyles.dialog}>
-            <h2>Selected Pools</h2>
-            <ul>
-              {selectedPools.map(pool => (
-                <li key={pool}>{pool}</li>
-              ))}
-            </ul>
-            <button onClick={handleContinue} className={dialogStyles.continueButton}>
-              Continue
-            </button>
-            <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+return (
+    <div className="loginContainer">
+      <Navbar sid={loggedInUser} />
+      <h1>Log In</h1>
+      <form onSubmit={handleSubmit} className="gridForm">
+        <label className="leftColumn">User SID:</label>
+        <input
+          className="inputBox"
+          type="text"
+          placeholder="SID"
+          value={sid}
+          onChange={(e) => setSID(e.target.value)}
+          required
+        />
+        <label className="leftColumn">Password:</label>
+        <input
+          className="inputBox"
+          type="password"
+          placeholder="Password"
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          required
+        />
+        <label>
+          <input type="checkbox" /> Remember me?
+        </label>
+        <a className="anchorLink" href="#">
+          SSO Login
+        </a>
+        <input type="submit" className="submitButton" value="Log in" />
+      </form>
     </div>
   );
 };
 
-export default PoolTable;
+export default LoginPage;
+Navbar Component
+Update the Navbar to receive and display the SID.
 
+tsx
+Copy code
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUser } from '@fortawesome/free-solid-svg-icons';
 
-import { style, globalStyle } from '@vanilla-extract/css';
+interface NavbarProps {
+  sid: string | null;
+}
 
-export const tableStyles = {
-  container: style({
-    width: '100%',
-    maxWidth: '1200px',
-    margin: '2rem auto',
-    backgroundColor: '#212121',
-    borderRadius: '8px',
-    overflow: 'hidden',
-  }),
-  table: style({
-    width: '100%',
-    borderCollapse: 'collapse',
-  }),
-  th: style({
-    backgroundColor: '#f2f2f2',
-    color: '#1796d9',
-    padding: '12px',
-    textAlign: 'left',
-    fontWeight: 'bold',
-  }),
-  td: style({
-    padding: '12px',
-    borderBottom: '1px solid #ddd',
-  }),
-  checkboxCell: style({
-    display: 'flex',
-    justifyContent: 'center',
-  }),
-  sortButton: style({
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    color: '#333',
-    padding: '0',
-    ':hover': {
-      color: '#007bff',
-    },
-  }),
-  showSelectedButton: style({
-    marginTop: '20px',
-    padding: '10px 20px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    ':hover': {
-      backgroundColor: '#0056b3',
-    },
-  }),
-  visuallyHidden: style({
-    position: 'absolute',
-    width: '1px',
-    height: '1px',
-    padding: '0',
-    margin: '-1px',
-    overflow: 'hidden',
-    clip: 'rect(0, 0, 0, 0)',
-    whiteSpace: 'nowrap',
-    border: '0',
-  }),
+const Navbar: React.FC<NavbarProps> = ({ sid }) => {
+  return (
+    <div className="container">
+      <div className="headingTitle">
+        <h1 className="headingText">
+          <img
+            className="favicon"
+            src="https://static.vecteezy.com/system/resources/previews/024/553/534/non_2x/lion-head-logo-mascot-wildlife-animal-illustration-generative-ai-png.png"
+            alt="favicon"
+          />
+          Migration
+        </h1>
+        <div className="loginInfo">
+          <FontAwesomeIcon icon={faUser} className="icon" />
+          <span>{sid || 'SID'}</span>
+        </div>
+      </div>
+      <div className="additionalInfo">
+        <a href="https://engineers.ipmchase.net/docs/runtime-compute/app/" className="docs">
+          Docs
+        </a>
+        <span>Help</span>
+      </div>
+    </div>
+  );
 };
 
-export const dialogStyles = {
-  overlay: style({
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  }),
-  dialog: style({
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    maxWidth: '500px',
-    width: '100%',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  }),
-  continueButton: style({
-    marginRight: '10px',
-    padding: '10px 20px',
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    ':hover': {
-      backgroundColor: '#218838',
-    },
-  }),
-  closeButton: style({
-    padding: '10px 20px',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    ':hover': {
-      backgroundColor: '#c82333',
-    },
-  }),
-};
-
-// Global styles
-globalStyle('body', {
-  margin: 0,
-  padding: 0,
-  backgroundColor: '#f0f2f5',
-});
-
-globalStyle(`${tableStyles.table} tr:hover`, {
-  backgroundColor: '#f5f5f5',
-});
-
-globalStyle(`${dialogStyles.dialog} h2`, {
-  marginTop: 0,
-  color: '#333',
-});
-
-globalStyle(`${dialogStyles.dialog} ul`, {
-  listStyleType: 'none',
-  padding: 0,
-});
-
-globalStyle(`${dialogStyles.dialog} li`, {
-  margin: '5px 0',
-});
+export default Navbar;
