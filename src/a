@@ -1,4 +1,20 @@
-return (
+const LoginPage = () => {
+  const [sid, setSID] = useState<string>('');
+  const [pass, setPass] = useState<string>('');
+  const [loggedInUser, setLoggedInUser] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    console.log(sid);
+
+    // Simulating user login
+    setLoggedInUser(sid);
+    setSID('');
+    navigate('/Landing');
+  };
+
+  return (
     <div className="loginContainer">
       <Navbar sid={loggedInUser} />
       <h1>Log In</h1>
@@ -34,44 +50,3 @@ return (
 };
 
 export default LoginPage;
-Navbar Component
-Update the Navbar to receive and display the SID.
-
-tsx
-Copy code
-import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser } from '@fortawesome/free-solid-svg-icons';
-
-interface NavbarProps {
-  sid: string | null;
-}
-
-const Navbar: React.FC<NavbarProps> = ({ sid }) => {
-  return (
-    <div className="container">
-      <div className="headingTitle">
-        <h1 className="headingText">
-          <img
-            className="favicon"
-            src="https://static.vecteezy.com/system/resources/previews/024/553/534/non_2x/lion-head-logo-mascot-wildlife-animal-illustration-generative-ai-png.png"
-            alt="favicon"
-          />
-          Migration
-        </h1>
-        <div className="loginInfo">
-          <FontAwesomeIcon icon={faUser} className="icon" />
-          <span>{sid || 'SID'}</span>
-        </div>
-      </div>
-      <div className="additionalInfo">
-        <a href="https://engineers.ipmchase.net/docs/runtime-compute/app/" className="docs">
-          Docs
-        </a>
-        <span>Help</span>
-      </div>
-    </div>
-  );
-};
-
-export default Navbar;
