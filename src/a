@@ -1,28 +1,33 @@
+
 const PoolTable: React.FC = () => {
   const [pools, setPools] = useState<Pool[]>([]);
   const [selectedPools, setSelectedPools] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState<'avgCpu' | 'utilization' | null>(null);
+  const [sortKey, setSortKey] = useState<'avgCpu' | 'available' | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setIsLoading(true);
     getFilteredPoolInfo()
       .then(response => {
-        const poolsWithUtilization = response.data.map(pool => ({
-          ...pool,
-          utilization: computeUtilization(pool.instances[0].capacity.available, pool.instances[0].capacity.total)
-        }));
-        setPools(poolsWithUtilization);
+        setPools(response.data);
+        setIsLoading(false);
       })
-      .catch(console.error);
+      .catch(err => {
+        console.error(err);
+        setError('Failed to fetch pool data');
+        setIsLoading(false);
+      });
   }, []);
 
-  const sortPools = (key: 'avgCpu' | 'utilization') => {
+  const sortPools = (key: 'avgCpu' | 'available') => {
     const desc = sortKey === key ? !sortDesc : true;
     const sortedPools = [...pools].sort((a, b) => {
-      const aValue = key === 'utilization' ? parseFloat(a[key].replace('%', '')) : a[key];
-      const bValue = key === 'utilization' ? parseFloat(b[key].replace('%', '')) : b[key];
-      return aValue > bValue ? (desc ? -1 : 1) : (desc ? 1 : -1);
+      const aValue = key === 'available' ? a.instances[0]?.capacity.available ?? 0 : a[key];
+      const bValue = key === 'available' ? b.instances[0]?.capacity.available ?? 0 : b[key];
+      return desc ? bValue - aValue : aValue - bValue;
     });
     setPools(sortedPools);
     setSortKey(key);
@@ -35,9 +40,9 @@ const PoolTable: React.FC = () => {
     );
   };
 
-  const SortButton = ({ column }: { column: 'avgCpu' | 'utilization' }) => (
+  const SortButton = ({ column }: { column: 'avgCpu' | 'available' }) => (
     <button onClick={() => sortPools(column)} className={tableStyles.sortButton}>
-      {column === 'avgCpu' ? 'Avg CPU' : 'Utilization'} {sortKey === column && (sortDesc ? '▼' : '▲')}
+      {column === 'avgCpu' ? 'Avg CPU' : 'Available'} {sortKey === column && (sortDesc ? '▼' : '▲')}
     </button>
   );
 
@@ -45,6 +50,9 @@ const PoolTable: React.FC = () => {
     console.log("Continuing with selected pools:", selectedPools);
     setShowDialog(false);
   };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <div className={tableStyles.container}>
@@ -54,10 +62,10 @@ const PoolTable: React.FC = () => {
             <th className={tableStyles.th}>Region</th>
             <th className={tableStyles.th}>Pool</th>
             <th className={tableStyles.th}>Data Center Type</th>
-            <th className={tableStyles.th}>Avg CPU</th>
+            <th className={tableStyles.th}><SortButton column="avgCpu" /></th>
             <th className={tableStyles.th}>Max Slice</th>
             <th className={tableStyles.th}>Next Repave</th>
-            <th className={tableStyles.th}>Utilization</th>
+            <th className={tableStyles.th}><SortButton column="available" /></th>
             <th className={tableStyles.th}>Select</th>
           </tr>
         </thead>
@@ -70,13 +78,16 @@ const PoolTable: React.FC = () => {
               <td className={tableStyles.td}>{roundCpu(pool.avgCpu)}</td>
               <td className={tableStyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
               <td className={tableStyles.td}>{pool.instances[0].nextRepave}</td>
-              <td className={tableStyles.td}>{computeUtilization(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}</td>
+              <td className={tableStyles.td}>{pool.instances[0].capacity.available}</td>
               <td className={`${tableStyles.td} ${tableStyles.checkboxCell}`}>
-                <input
-                  type="checkbox"
-                  checked={selectedPools.includes(pool.pool)}
-                  onChange={() => togglePoolSelection(pool.pool)}
-                />
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selectedPools.includes(pool.pool)}
+                    onChange={() => togglePoolSelection(pool.pool)}
+                  />
+                  <span className={tableStyles.visuallyHidden}>Select {pool.pool}</span>
+                </label>
               </td>
             </tr>
           ))}
@@ -110,6 +121,7 @@ const PoolTable: React.FC = () => {
 export default PoolTable;
 
 
+import { style, globalStyle } from '@vanilla-extract/css';
 
 export const tableStyles = {
   container: style({
@@ -162,6 +174,17 @@ export const tableStyles = {
     ':hover': {
       backgroundColor: '#0056b3',
     },
+  }),
+  visuallyHidden: style({
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: '0',
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: '0',
   }),
 };
 
