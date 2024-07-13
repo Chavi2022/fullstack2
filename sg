@@ -1,93 +1,28 @@
-import { style, styleVariants } from '@vanilla-extract/css';
-
-export const tableStyles = {
-  container: style({
-    width: '100%',
-    maxWidth: '1600px',
-    margin: '2rem auto',
-    backgroundColor: '#1e1e1e',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    fontFamily: 'Arial, sans-serif',
-  }),
-  table: style({
-    width: '100%',
-    borderCollapse: 'collapse',
-  }),
-  th: style({
-    backgroundColor: '#2a2a2a',
-    color: '#ffffff',
-    padding: '12px 16px',
-    textAlign: 'left',
-    fontWeight: 'bold',
-    fontSize: '14px',
-  }),
-  td: style({
-    padding: '12px 16px',
-    backgroundColor: '#252525',
-    color: '#ffffff',
-    fontSize: '14px',
-  }),
-  utilization: style({
-    display: 'flex',
-    alignItems: 'center',
-  }),
-  utilizationBar: style({
-    height: '8px',
-    borderRadius: '4px',
-    marginRight: '8px',
-    backgroundColor: '#4caf50',
-    flexGrow: 1,
-  }),
-  utilizationText: style({
-    marginLeft: '8px',
-  }),
-  showSelectedButton: style({
-    marginTop: '20px',
-    padding: '10px 20px',
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    ':hover': {
-      backgroundColor: '#45a049',
-    },
-  }),
-  selectedPools: style({
-    marginTop: '20px',
-    padding: '10px 20px',
-    backgroundColor: '#2a2a2a',
-    borderRadius: '8px',
-    color: '#ffffff',
-  }),
-};
-
-export const utilizationBarVariants = styleVariants({
-  low: { backgroundColor: '#4caf50' },
-  medium: { backgroundColor: '#ffc107' },
-  high: { backgroundColor: '#ff5722' }
-});
-Updated PoolTable.tsx
-typescript
-Copy code
-import React, { useState, useEffect } from 'react';
-import { getFilteredPoolInfo } from '../../services/filteredPoolService'; // Adjust path as needed
-import type { Pool } from '../../interfaces/Pool'; // Adjust path as needed
-import { roundCpu, computeAvailability, formatSlice } from '../../utils/change'; // Adjust path as needed
 import { tableStyles, utilizationBarVariants } from './tableStyles.css'; // Adjust path as needed
 
 function formatNextRepave(dateString: string): string {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days are ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const dayName = days[date.getDay()];
   const monthName = months[date.getMonth()];
   const dayOfMonth = date.getDate();
   return `${dayName}, ${monthName} ${dayOfMonth}`;
 }
+
+const SortButton: React.FC<{ column: 'avgCpu' | 'availability' | 'maxSlice'; sortKey: string; sortDesc: boolean; onSort: (column: 'avgCpu' | 'availability' | 'maxSlice') => void }> = ({ column, sortKey, sortDesc, onSort }) => {
+  const columnName =
+    column === 'avgCpu' ? 'Avg CPU' :
+    column === 'availability' ? 'Availability' :
+    'Max Slice';
+
+  return (
+    <button onClick={() => onSort(column)} className={tableStyles.sortButton}>
+      {columnName} {sortKey === column ? (sortDesc ? '▼' : '▲') : '⇅'}
+    </button>
+  );
+};
 
 const PoolTable: React.FC = () => {
   const [pools, setPools] = useState<Pool[]>([]);
@@ -111,35 +46,26 @@ const PoolTable: React.FC = () => {
       });
   }, []);
 
-  const sortByAvgCpu = () => {
-    const desc = sortKey === 'avgCpu' ? !sortDesc : true;
-    const sortedPools = [...pools].sort((a, b) => desc ? b.avgCpu - a.avgCpu : a.avgCpu - b.avgCpu);
+  const handleSort = (column: 'avgCpu' | 'availability' | 'maxSlice') => {
+    const desc = sortKey === column ? !sortDesc : true;
+    let sortedPools = [...pools];
+    if (column === 'avgCpu') {
+      sortedPools = sortedPools.sort((a, b) => desc ? b.avgCpu - a.avgCpu : a.avgCpu - b.avgCpu);
+    } else if (column === 'availability') {
+      sortedPools = sortedPools.sort((a, b) => {
+        const aValue = a.instances[0]?.capacity.available ?? 0;
+        const bValue = b.instances[0]?.capacity.available ?? 0;
+        return desc ? bValue - aValue : aValue - bValue;
+      });
+    } else if (column === 'maxSlice') {
+      sortedPools = sortedPools.sort((a, b) => {
+        const aValue = a.instances[0]?.capacity.maxSlice ?? 0;
+        const bValue = b.instances[0]?.capacity.maxSlice ?? 0;
+        return desc ? bValue - aValue : aValue - bValue;
+      });
+    }
     setPools(sortedPools);
-    setSortKey('avgCpu');
-    setSortDesc(desc);
-  };
-
-  const sortByAvailability = () => {
-    const desc = sortKey === 'availability' ? !sortDesc : true;
-    const sortedPools = [...pools].sort((a, b) => {
-      const aValue = a.instances[0]?.capacity.available ?? 0;
-      const bValue = b.instances[0]?.capacity.available ?? 0;
-      return desc ? bValue - aValue : aValue - bValue;
-    });
-    setPools(sortedPools);
-    setSortKey('availability');
-    setSortDesc(desc);
-  };
-
-  const sortByMaxSlice = () => {
-    const desc = sortKey === 'maxSlice' ? !sortDesc : true;
-    const sortedPools = [...pools].sort((a, b) => {
-      const aValue = a.instances[0]?.capacity.maxSlice ?? 0;
-      const bValue = b.instances[0]?.capacity.maxSlice ?? 0;
-      return desc ? bValue - aValue : aValue - bValue;
-    });
-    setPools(sortedPools);
-    setSortKey('maxSlice');
+    setSortKey(column);
     setSortDesc(desc);
   };
 
@@ -152,24 +78,6 @@ const PoolTable: React.FC = () => {
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
-  const SortButton: React.FC<{ column: 'avgCpu' | 'availability' | 'maxSlice' }> = ({ column }) => {
-    const sortFunction =
-      column === 'avgCpu' ? sortByAvgCpu :
-      column === 'availability' ? sortByAvailability :
-      sortByMaxSlice;
-
-    const columnName =
-      column === 'avgCpu' ? 'Avg CPU' :
-      column === 'availability' ? 'Availability' :
-      'Max Slice';
-
-    return (
-      <button onClick={sortFunction} className={tableStyles.sortButton}>
-        {columnName} {sortKey === column ? (sortDesc ? '▼' : '▲') : '⇅'}
-      </button>
-    );
-  };
-
   return (
     <div className={tableStyles.container}>
       <table className={tableStyles.table}>
@@ -177,9 +85,15 @@ const PoolTable: React.FC = () => {
           <tr>
             <th className={tableStyles.th}>Region</th>
             <th className={tableStyles.th}>Pool</th>
-            <th className={tableStyles.th}><SortButton column="avgCpu" /></th>
-            <th className={tableStyles.th}><SortButton column="maxSlice" /></th>
-            <th className={tableStyles.th}><SortButton column="availability" /></th>
+            <th className={tableStyles.th}>
+              <SortButton column="avgCpu" sortKey={sortKey} sortDesc={sortDesc} onSort={handleSort} />
+            </th>
+            <th className={tableStyles.th}>
+              <SortButton column="maxSlice" sortKey={sortKey} sortDesc={sortDesc} onSort={handleSort} />
+            </th>
+            <th className={tableStyles.th}>
+              <SortButton column="availability" sortKey={sortKey} sortDesc={sortDesc} onSort={handleSort} />
+            </th>
             <th className={tableStyles.th}>Next Repave</th>
             <th className={tableStyles.th}>Select</th>
           </tr>
@@ -224,7 +138,7 @@ const PoolTable: React.FC = () => {
                     }}
                   />
                   <span className={tableStyles.utilizationText}>
-                    {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
+                    {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%
                   </span>
                 </div>
               </td>
