@@ -3,7 +3,7 @@ import { tableStyles, utilizationBarVariants } from './tableStyles.css'; // Adju
 function formatNextRepave(dateString: string): string {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  const days are ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const dayName = days[date.getDay()];
   const monthName = months[date.getMonth()];
@@ -11,7 +11,7 @@ function formatNextRepave(dateString: string): string {
   return `${dayName}, ${monthName} ${dayOfMonth}`;
 }
 
-const SortButton: React.FC<{ column: 'avgCpu' | 'availability' | 'maxSlice'; sortKey: string; sortDesc: boolean; onSort: (column: 'avgCpu' | 'availability' | 'maxSlice') => void }> = ({ column, sortKey, sortDesc, onSort }) => {
+const SortButton: React.FC<{ column: 'avgCpu' | 'availability' | 'maxSlice'; sortKey: 'avgCpu' | 'availability' | 'maxSlice' | null; sortDesc: boolean; onSort: (column: 'avgCpu' | 'availability' | 'maxSlice') => void }> = ({ column, sortKey, sortDesc, onSort }) => {
   const columnName =
     column === 'avgCpu' ? 'Avg CPU' :
     column === 'availability' ? 'Availability' :
@@ -75,6 +75,11 @@ const PoolTable: React.FC = () => {
     );
   };
 
+  const getAvailabilityPercentage = (available: number, total: number): number => {
+    if (total === 0) return 0;
+    return Math.round(((total - available) / total) * 100);
+  };
+
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -128,21 +133,21 @@ const PoolTable: React.FC = () => {
                       tableStyles.utilizationBar +
                       ' ' +
                       utilizationBarVariants[
-                        computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 70 ? 'high' : 
-                        computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 50 ? 'medium' : 
+                        getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 70 ? 'high' : 
+                        getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 50 ? 'medium' : 
                         'low'
                       ]
                     }
                     style={{
-                      width: `${computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%`,
+                      width: `${getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%`,
                     }}
                   />
                   <span className={tableStyles.utilizationText}>
-                    {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%
+                    {getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%
                   </span>
                 </div>
               </td>
-              <td className={tableStyles.td}>{pool.instances[0]?.nextRepave ? formatNextRepave(pool.instances[0].nextRepave) : 'N/A'}</td>
+              <td className={tableStyles.td}>{pool.instances[0]?.nextRepave2 ? formatNextRepave(pool.instances[0].nextRepave2) : 'N/A'}</td>
               <td className={tableStyles.td}>
                 <input
                   type="checkbox"
