@@ -1,20 +1,7 @@
-const SortButton: React.FC<{ column: 'avgCpu' | 'availability' | 'maxSlice'; sortKey: 'avgCpu' | 'availability' | 'maxSlice' | null; sortDesc: boolean; onSort: (column: 'avgCpu' | 'availability' | 'maxSlice') => void }> = ({ column, sortKey, sortDesc, onSort }) => {
-  const columnName =
-    column === 'avgCpu' ? 'Avg CPU' :
-    column === 'availability' ? 'Availability' :
-    'Max Slice';
-
-  return (
-    <button onClick={() => onSort(column)} className={tableStyles.sortButton}>
-      {columnName} {sortKey === column ? (sortDesc ? '▼' : '▲') : '⇅'}
-    </button>
-  );
-};
-
 const PoolTable: React.FC = () => {
   const [pools, setPools] = useState<Pool[]>([]);
   const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
-  const [sortKey, setSortKey] = useState<'avgCpu' | 'availability' | 'maxSlice' | null>(null);
+  const [sortKey, setSortKey] = useState<'avgCpu' | 'available' | 'maxSlice' | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,21 +22,34 @@ const PoolTable: React.FC = () => {
 
   const sortByAvgCpu = () => {
     const desc = sortKey === 'avgCpu' ? !sortDesc : true;
-    const sortedPools = [...pools].sort((a, b) => desc ? b.avgCpu - a.avgCpu : a.avgCpu - b.avgCpu);
+    const sortedPools = [...pools].sort((a, b) => {
+      return desc ? b.avgCpu - a.avgCpu : a.avgCpu - b.avgCpu;
+    });
     setPools(sortedPools);
     setSortKey('avgCpu');
     setSortDesc(desc);
   };
 
-  const sortByAvailability = () => {
-    const desc = sortKey === 'availability' ? !sortDesc : true;
+  const sortByAvailable = () => {
+    const desc = sortKey === 'available' ? !sortDesc : true;
     const sortedPools = [...pools].sort((a, b) => {
-      const aValue = a.instances[0]?.capacity.available ?? 0;
-      const bValue = b.instances[0]?.capacity.available ?? 0;
-      return desc ? bValue - aValue : aValue - bValue;
+      const aInstance = a.instances[0];
+      const bInstance = b.instances[0];
+      
+      if(!aInstance || !bInstance) return 0;
+      
+      const aPercentage = (aInstance.capacity.available / aInstance.capacity.total) * 100;
+      const bPercentage = (bInstance.capacity.available / bInstance.capacity.total) * 100;
+      
+      if (aPercentage === bPercentage) return 0;
+      if(desc){
+        return bPercentage - aPercentage;
+      } else {
+        return aPercentage - bPercentage;
+      }
     });
     setPools(sortedPools);
-    setSortKey('availability');
+    setSortKey('available');
     setSortDesc(desc);
   };
 
@@ -76,6 +76,24 @@ const PoolTable: React.FC = () => {
     return Math.round(((total - available) / total) * 100);
   };
 
+  const SortButton = ({ column }: { column: 'avgCpu' | 'available' | 'maxSlice' }) => {
+    const sortFunction = 
+      column === 'avgCpu' ? sortByAvgCpu :
+      column === 'available' ? sortByAvailable :
+      sortByMaxSlice;
+
+    const columnName =
+      column === 'avgCpu' ? 'Avg CPU' :
+      column === 'available' ? 'Available' :
+      'Max Slice';
+
+    return (
+      <button onClick={sortFunction} className={tableStyles.sortButton}>
+        {columnName} {sortKey === column && (sortDesc ? '▼' : '▲')}
+      </button>
+    );
+  };
+
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -86,9 +104,15 @@ const PoolTable: React.FC = () => {
           <tr>
             <th className={tableStyles.th}>Region</th>
             <th className={tableStyles.th}>Pool</th>
-            <th className={tableStyles.th}><button onClick={sortByAvgCpu} className={tableStyles.sortButton}>Avg CPU {sortKey === 'avgCpu' ? (sortDesc ? '▼' : '▲') : '⇅'}</button></th>
-            <th className={tableStyles.th}><button onClick={sortByMaxSlice} className={tableStyles.sortButton}>Max Slice {sortKey === 'maxSlice' ? (sortDesc ? '▼' : '▲') : '⇅'}</button></th>
-            <th className={tableStyles.th}><button onClick={sortByAvailability} className={tableStyles.sortButton}>Availability {sortKey === 'availability' ? (sortDesc ? '▼' : '▲') : '⇅'}</button></th>
+            <th className={tableStyles.th}>
+              <SortButton column="avgCpu" />
+            </th>
+            <th className={tableStyles.th}>
+              <SortButton column="maxSlice" />
+            </th>
+            <th className={tableStyles.th}>
+              <SortButton column="available" />
+            </th>
             <th className={tableStyles.th}>Next Repave</th>
             <th className={tableStyles.th}>Select</th>
           </tr>
@@ -162,3 +186,94 @@ const PoolTable: React.FC = () => {
 };
 
 export default PoolTable;
+And here's the updated tableStyles.css:
+javascriptCopyimport { style, styleVariants } from '@vanilla-extract/css';
+
+export const tableStyles = {
+  container: style({
+    width: '100%',
+    maxWidth: '1600px',
+    margin: '2rem auto',
+    backgroundColor: '#1e1e1e',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    fontFamily: 'Arial, sans-serif',
+  }),
+  table: style({
+    width: '100%',
+    borderCollapse: 'collapse',
+  }),
+  th: style({
+    backgroundColor: '#2a2a2a',
+    color: '#ffffff',
+    padding: '12px 16px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '14px',
+  }),
+  td: style({
+    padding: '12px 16px',
+    backgroundColor: '#252525',
+    color: '#ffffff',
+    fontSize: '14px',
+  }),
+  utilization: style({
+    display: 'flex',
+    alignItems: 'center',
+  }),
+  utilizationBar: style({
+    height: '8px',
+    borderRadius: '4px',
+    marginRight: '8px',
+    backgroundColor: '#4caf50',
+    flexGrow: 1,
+  }),
+  utilizationText: style({
+    marginLeft: '8px',
+  }),
+  showSelectedButton: style({
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    ':hover': {
+      backgroundColor: '#45a049',
+    },
+  }),
+  selectedPools: style({
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: '#2a2a2a',
+    borderRadius: '8px',
+    color: '#ffffff',
+  }),
+  sortButton: style({
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    color: '#ffffff',
+    padding: '0',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    ':hover': {
+      color: '#4CAF50',
+    },
+    '::after': {
+      content: '"⇅"',
+      marginLeft: '4px',
+    },
+  }),
+};
+
+export const utilizationBarVariants = styleVariants({
+  low: { backgroundColor: '#4caf50' },
+  medium: { backgroundColor: '#ffc107' },
+  high: { backgroundColor: '#ff5722' }
+});
