@@ -31,17 +31,22 @@ export const tableStyles = {
   utilization: style({
     display: 'flex',
     alignItems: 'center',
-    backgroundColor: '#3a3a3a', // Grey background for the bar container
+    backgroundColor: '#3a3a3a', 
     borderRadius: '4px',
     overflow: 'hidden',
+    height: '16px',
+    width: '100%',
+    position: 'relative',
   }),
   utilizationBar: style({
-    height: '8px',
+    height: '100%',
     borderRadius: '4px',
-    flexGrow: 1,
+    position: 'absolute',
   }),
   utilizationText: style({
     marginLeft: '8px',
+    position: 'relative',
+    zIndex: 1,
   }),
   showSelectedButton: style({
     marginTop: '20px',
@@ -63,6 +68,7 @@ export const tableStyles = {
     borderRadius: '8px',
     color: '#ffffff',
     listStyleType: 'none',
+    paddingLeft: 0, // Remove padding left to get rid of bullet point space
   }),
   sortButton: style({
     background: 'none',
@@ -150,6 +156,8 @@ export const dialogStyles = {
     },
   }),
 };
+
+
 
 
 
@@ -321,7 +329,7 @@ const PoolTable: React.FC = () => {
       )}
       <div className={tableStyles.selectedPools}>
         <h2>Selected Pools</h2>
-        <ul>
+        <ul className={tableStyles.selectedPools}>
           {selectedPools.map(pool => (
             <li key={pool.pool}>{pool.pool}</li>
           ))}
