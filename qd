@@ -1,17 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { getFilteredPoolInfo } from '../../services/FilteredPoolService';
-import type { Pool } from '../../Interfaces/Pools';
-import { roundCpu, formatSlice, computeAvailability } from '../../utils/change';
-import { tablestyles, utilizationBarVariants, dialogStyles } from './tablestyles.css';
-
 function formatNextRepave(nextRepave: string): string {
   if (!nextRepave) return 'N/A';
   const nextRepave2 = nextRepave.substring(0, 10);
   return nextRepave2;
-}
-
-interface LinkAlt {
-  onClick: (event: React.MouseEvent<HTMLFormElement>) => void;
 }
 
 const PoolTable: React.FC = () => {
@@ -52,6 +42,45 @@ const PoolTable: React.FC = () => {
     return Math.round((available / total) * 100);
   };
 
+  const sortByAvgCpu = () => {
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = a.avgCpu;
+      const bValue = b.avgCpu;
+      return sortDesc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('avgCpu');
+    setSortDesc(!sortDesc);
+  };
+
+  const sortByMaxSlice = () => {
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = a.instances[0].capacity.maxSlice;
+      const bValue = b.instances[0].capacity.maxSlice;
+      return sortDesc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('maxSlice');
+    setSortDesc(!sortDesc);
+  };
+
+  const sortByAvailability = () => {
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = getAvailabilityPercentage(a.instances[0].capacity.available, a.instances[0].capacity.total);
+      const bValue = getAvailabilityPercentage(b.instances[0].capacity.available, b.instances[0].capacity.total);
+      return sortDesc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('availability');
+    setSortDesc(!sortDesc);
+  };
+
+  const getUtilizationBarClass = (percentage: number) => {
+    if (percentage > 70) return utilizationBarVariants.high;
+    if (percentage > 50) return utilizationBarVariants.medium;
+    return utilizationBarVariants.low;
+  };
+
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>{error}</div>;
 
@@ -63,21 +92,41 @@ const PoolTable: React.FC = () => {
           <tr>
             <th className={tablestyles.th}>Region</th>
             <th className={tablestyles.th}>Pool</th>
-            <th className={tablestyles.th}>Avg CPU</th>
-            <th className={tablestyles.th}>Max Slice</th>
-            <th className={tablestyles.th}>Availability</th>
+            <th className={tablestyles.th}>
+              Avg CPU
+              <button onClick={sortByAvgCpu}>{sortKey === 'avgCpu' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
+            </th>
+            <th className={tablestyles.th}>
+              Max Slice
+              <button onClick={sortByMaxSlice}>{sortKey === 'maxSlice' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
+            </th>
+            <th className={tablestyles.th}>
+              Availability
+              <button onClick={sortByAvailability}>{sortKey === 'availability' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
+            </th>
             <th className={tablestyles.th}>Select</th>
           </tr>
         </thead>
         <tbody>
           {pools.map((pool) => (
-            <tr key={pool.id} className={tablestyles.tr}>
+            <tr key={pool.pool} className={tablestyles.tr}>
               <td className={tablestyles.td}>{pool.region}</td>
               <td className={tablestyles.td}>{pool.pool}</td>
-              <td className={tablestyles.td}>{pool.avgCpu}</td>
+              <td className={tablestyles.td}>{roundCpu(pool.avgCpu)}</td>
               <td className={tablestyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
               <td className={tablestyles.td}>
-                {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
+                <div
+                  className={getUtilizationBarClass(
+                    getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)
+                  )}
+                  style={{
+                    width: `${getAvailabilityPercentage(
+                      pool.instances[0].capacity.available, pool.instances[0].capacity.total
+                    )}%`
+                  }}
+                >
+                  {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
+                </div>
               </td>
               <td className={tablestyles.td}>
                 <input
@@ -99,7 +148,7 @@ const PoolTable: React.FC = () => {
             <h2>Selected Pools</h2>
             <ul className={tablestyles.selectedPools}>
               {selectedPools.map((pool) => (
-                <li key={pool.id}>{pool.pool}</li>
+                <li key={pool.pool}>{pool.pool}</li>
               ))}
             </ul>
             <button onClick={handleConfirm} className={dialogStyles.continueButton}>
@@ -116,7 +165,7 @@ const PoolTable: React.FC = () => {
           <h2>Confirmed Pools</h2>
           <ul>
             {confirmedPools.map((pool) => (
-              <li key={pool.id}>{pool.pool}</li>
+              <li key={pool.pool}>{pool.pool}</li>
             ))}
           </ul>
           <button
@@ -133,7 +182,8 @@ const PoolTable: React.FC = () => {
 
 export default PoolTable;
 
-import { style } from '@vanilla-extract/css';
+
+import { style, styleVariants } from '@vanilla-extract/css';
 
 export const tablestyles = {
   container: style({
@@ -190,7 +240,18 @@ export const tablestyles = {
   }),
 };
 
-// Additional styles for dialog and migration button...
+export const utilizationBarVariants = styleVariants({
+  low: {
+    backgroundColor: '#4CAF50',
+  },
+  medium: {
+    backgroundColor: '#FFC107',
+  },
+  high: {
+    backgroundColor: '#F44336',
+  },
+});
+
 export const dialogStyles = {
   overlay: style({
     position: 'fixed',
