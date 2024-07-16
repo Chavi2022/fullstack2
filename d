@@ -65,6 +65,15 @@ export const tableStyles = {
       backgroundColor: '#45a049',
     },
   }),
+  selectedPools: style({
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: '#2a2a2a',
+    color: '#ffffff',
+    borderRadius: '8px',
+    listStyleType: 'none',
+    paddingLeft: 0,
+  }),
   sortButton: style({
     background: 'none',
     border: 'none',
@@ -89,9 +98,9 @@ export const tableStyles = {
 };
 
 export const utilizationBarVariants = styleVariants({
-  low: { backgroundColor: '#1b5e20' },
-  medium: { backgroundColor: '#f9a825' },
-  high: { backgroundColor: '#b71c1c' },
+  low: { backgroundColor: '#4caf50' },
+  medium: { backgroundColor: '#ffeb3b' },
+  high: { backgroundColor: '#ff5722' },
 });
 
 export const dialogStyles = {
@@ -168,55 +177,42 @@ export const dialogStyles = {
       backgroundColor: '#1976D2',
     },
   }),
-  deleteButton: style({
-    padding: '6px 12px',
-    backgroundColor: '#d32f2f',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
+  disabledButton: style({
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  }),
+  migrationOption: style({
     cursor: 'pointer',
-    fontSize: '14px',
-    marginLeft: '10px',
+    padding: '8px',
     ':hover': {
-      backgroundColor: '#b71c1c',
+      backgroundColor: '#333333',
     },
   }),
-  confirmedPoolsContainer: style({
-    marginTop: '20px',
-    padding: '20px',
-    backgroundColor: '#2a2a2a',
-    borderRadius: '8px',
+  migrationOptions: style({
+    listStyleType: 'none',
+    padding: 0,
+  }),
+  confirmedPools: style({
+    listStyleType: 'none',
+    padding: 0,
   }),
   confirmedPoolItem: style({
     padding: '10px',
-    border: '1px solid #3a3a3a',
+    border: '1px solid #9a9ac6',
     marginBottom: '10px',
     borderRadius: '5px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   }),
-  selectedPools: style({
-    listStyleType: 'none',
-    padding: 0,
-    margin: 0,
-  }),
-  migrationOptions: style({
-    listStyleType: 'none',
-    padding: 0,
-    margin: 0,
-  }),
-  confirmedPools: style({
-    listStyleType: 'none',
-    padding: 0,
-    margin: 0,
-  }),
 };
 
 
-import React, { useState, useEffect } from 'react';
-import { tableStyles, dialogStyles, utilizationBarVariants } from './styles';
 
+
+
+
+  
 function formatNextRepave(nextRepave: string): string {
   if (!nextRepave) return 'N/A';
   const nextRepave2 = nextRepave.substring(0, 10);
@@ -308,7 +304,156 @@ const PoolTable: React.FC = (): Element => {
 
   return (
     <div className={tableStyles.container}>
-      {/* Component JSX */}
+      <h2>Select pools to migrate</h2>
+      <table className={tableStyles.table}>
+        <thead>
+          <tr>
+            <th className={tableStyles.th}>Region</th>
+            <th className={tableStyles.th}>Pool</th>
+            <th className={tableStyles.th}>
+              <button onClick={sortByAvgCpu} className={tableStyles.sortButton}>
+                Avg CPU {sortKey === 'avgCpu' ? (sortDesc ? '▼' : '▲') : ''}
+              </button>
+            </th>
+            <th className={tableStyles.th}>
+              <button onClick={sortByMaxSlice} className={tableStyles.sortButton}>
+                Max Slice {sortKey === 'maxSlice' ? (sortDesc ? '▼' : '▲') : ''}
+              </button>
+            </th>
+            <th className={tableStyles.th}>
+              <button onClick={sortByAvailability} className={tableStyles.sortButton}>
+                Availability {sortKey === 'availability' ? (sortDesc ? '▼' : '▲') : ''}
+              </button>
+            </th>
+            <th className={tableStyles.th}>Next Repave</th>
+            <th className={tableStyles.th}>Select</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pools.map((pool: Pool) => (
+            <tr key={pool.pool}>
+              <td className={tableStyles.td}>{pool.region}</td>
+              <td className={tableStyles.td}>{pool.pool}</td>
+              <td className={tableStyles.td}>
+                <div className={tableStyles.utilization}>
+                  <div
+                    className={tableStyles.utilizationBar}
+                    style={{
+                      width: `${pool.avgCpu}%`,
+                      backgroundColor: utilizationBarVariants[
+                        pool.avgCpu > 70 ? 'high' : pool.avgCpu > 50 ? 'medium' : 'low'
+                      ],
+                    }}
+                  />
+                  <span className={tableStyles.utilizationText}>{roundCpu(pool.avgCpu)}%</span>
+                </div>
+              </td>
+              <td className={tableStyles.td}>
+                <span className={tableStyles.utilizationText}>
+                  {pool.instances[0]?.capacity.maxSlice ?? 0}
+                </span>
+              </td>
+              <td className={tableStyles.td}>
+                <div className={tableStyles.utilization}>
+                  <div
+                    className={tableStyles.utilizationBar}
+                    style={{
+                      width: `${getAvailabilityPercentage(
+                        pool.instances[0]?.capacity.available ?? 0,
+                        pool.instances[0]?.capacity.total ?? 0
+                      )}%`,
+                      backgroundColor: utilizationBarVariants[
+                        getAvailabilityPercentage(
+                          pool.instances[0]?.capacity.available ?? 0,
+                          pool.instances[0]?.capacity.total ?? 0
+                        ) > 70
+                          ? 'high'
+                          : getAvailabilityPercentage(
+                              pool.instances[0]?.capacity.available ?? 0,
+                              pool.instances[0]?.capacity.total ?? 0
+                            ) > 50
+                          ? 'medium'
+                          : 'low'
+                      ],
+                    }}
+                  />
+                  <span className={tableStyles.utilizationText}>
+                    {getAvailabilityPercentage(
+                      pool.instances[0]?.capacity.available ?? 0,
+                      pool.instances[0]?.capacity.total ?? 0
+                    )}
+                    %
+                  </span>
+                </div>
+              </td>
+              <td className={tableStyles.td}>
+                {pool.instances[0]?.nextRepave
+                  ? formatNextRepave(pool.instances[0].nextRepave)
+                  : 'N/A'}
+              </td>
+              <td className={tableStyles.td}>
+                <input
+                  type="checkbox"
+                  checked={selectedPools.includes(pool)}
+                  onChange={() => togglePoolSelection(pool)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        onClick={handleConfirm}
+        className={`${tableStyles.showSelectedButton} ${
+          selectedPools.length === 0 ? tableStyles.disabledButton : ''
+        }`}
+        disabled={selectedPools.length === 0}
+      >
+        Confirm Selected Pools
+      </button>
+      {showDialog && (
+        <div className={dialogStyles.overlay}>
+          <div className={dialogStyles.dialog}>
+            <h2>Select Migration Target{selectedPools.length > 1 ? 's' : ''}</h2>
+            <ul className={dialogStyles.selectedPools}>
+              {selectedPools.map((pool) => (
+                <li key={pool.pool}>{pool.pool}</li>
+              ))}
+            </ul>
+            <h3>Other Available Pools</h3>
+            <ul className={dialogStyles.migrationOptions}>
+              {pools
+                .filter((pool) => !selectedPools.includes(pool))
+                .map((pool) => (
+                  <li key={pool.pool} onClick={() => handleMigrate(pool)} className={dialogStyles.migrationOption}>
+                    {pool.pool}
+                  </li>
+                ))}
+            </ul>
+            <button onClick={() => setShowDialog(false)} className={dialogStyles.confirmButton}>
+              Confirm
+            </button>
+            <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmedPools.length > 0 && (
+        <div>
+          <h3>Confirmed Pools for Migration</h3>
+          <ul className={dialogStyles.confirmedPools}>
+            {confirmedPools.map((pool) => (
+              <li key={pool.pool} className={dialogStyles.confirmedPoolItem}>
+                {pool.pool}
+                <button onClick={() => handleMigrate(pool)} className={dialogStyles.migrateButton}>
+                  Migrate
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };
