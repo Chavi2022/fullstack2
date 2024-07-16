@@ -1,201 +1,3 @@
-
-
-
-function formatNextRepave(nextRepave: string): string {
-  if (!nextRepave) return 'N/A';
-  const nextRepave2 = nextRepave.substring(0, 10);
-  return nextRepave2;
-}
-
-const PoolTable: React.FC = () => {
-  const [pools, setPools] = useState<Pool[]>([]);
-  const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
-  const [confirmedPools, setConfirmedPools] = useState<Pool[]>([]);
-  const [sortKey, setSortKey] = useState<string | null>('availability');
-  const [sortDesc, setSortDesc] = useState<boolean>(true);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showDialog, setShowDialog] = useState<boolean>(false);
-
-  useEffect(() => {
-    getFilteredPoolInfo()
-      .then((response) => {
-        setPools(response.data);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError('Failed to fetch pool data');
-        setIsLoading(false);
-      });
-  }, []);
-
-  const handleConfirm = () => {
-    setConfirmedPools(selectedPools);
-    setSelectedPools([]);
-  };
-
-  const togglePoolSelection = (pool: Pool) => {
-    setSelectedPools((prev) =>
-      prev.includes(pool) ? prev.filter((p) => p !== pool) : [...prev, pool]
-    );
-  };
-
-  const getAvailabilityPercentage = (available: number, total: number): number => {
-    if (total === 0) return 0;
-    return Math.round((available / total) * 100);
-  };
-
-  const sortByAvgCpu = () => {
-    const sortedPools = [...pools].sort((a, b) => {
-      const aValue = a.avgCpu;
-      const bValue = b.avgCpu;
-      return sortDesc ? bValue - aValue : aValue - bValue;
-    });
-    setPools(sortedPools);
-    setSortKey('avgCpu');
-    setSortDesc(!sortDesc);
-  };
-
-  const sortByMaxSlice = () => {
-    const sortedPools = [...pools].sort((a, b) => {
-      const aValue = a.instances[0].capacity.maxSlice;
-      const bValue = b.instances[0].capacity.maxSlice;
-      return sortDesc ? bValue - aValue : aValue - bValue;
-    });
-    setPools(sortedPools);
-    setSortKey('maxSlice');
-    setSortDesc(!sortDesc);
-  };
-
-  const sortByAvailability = () => {
-    const sortedPools = [...pools].sort((a, b) => {
-      const aValue = getAvailabilityPercentage(a.instances[0].capacity.available, a.instances[0].capacity.total);
-      const bValue = getAvailabilityPercentage(b.instances[0].capacity.available, b.instances[0].capacity.total);
-      return sortDesc ? bValue - aValue : aValue - bValue;
-    });
-    setPools(sortedPools);
-    setSortKey('availability');
-    setSortDesc(!sortDesc);
-  };
-
-  const getUtilizationBarClass = (percentage: number) => {
-    if (percentage < 50) return utilizationBarVariants.high;
-    if (percentage < 70) return utilizationBarVariants.medium;
-    return utilizationBarVariants.low;
-  };
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>{error}</div>;
-
-  return (
-    <div className={tablestyles.container}>
-      <h1>Latest Pool Information</h1>
-      <table className={tablestyles.table}>
-        <thead>
-          <tr>
-            <th className={tablestyles.th}>Region</th>
-            <th className={tablestyles.th}>Pool</th>
-            <th className={tablestyles.th}>
-              Avg CPU
-              <button onClick={sortByAvgCpu}>{sortKey === 'avgCpu' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
-            </th>
-            <th className={tablestyles.th}>
-              Max Slice
-              <button onClick={sortByMaxSlice}>{sortKey === 'maxSlice' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
-            </th>
-            <th className={tablestyles.th}>
-              Availability
-              <button onClick={sortByAvailability}>{sortKey === 'availability' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
-            </th>
-            <th className={tablestyles.th}>Select</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pools.map((pool) => (
-            <tr key={pool.pool} className={tablestyles.tr}>
-              <td className={tablestyles.td}>{pool.region}</td>
-              <td className={tablestyles.td}>{pool.pool}</td>
-              <td className={tablestyles.td}>
-                <div className={tablestyles.utilizationBarContainer}>
-                  <div
-                    className={`${tablestyles.utilizationBar} ${getUtilizationBarClass(pool.avgCpu)}`}
-                    style={{ width: `${pool.avgCpu}%` }}
-                  >
-                    {roundCpu(pool.avgCpu)}
-                  </div>
-                </div>
-              </td>
-              <td className={tablestyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
-              <td className={tablestyles.td}>
-                <div className={tablestyles.utilizationBarContainer}>
-                  <div
-                    className={`${tablestyles.utilizationBar} ${getUtilizationBarClass(
-                      getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)
-                    )}`}
-                    style={{
-                      width: `${getAvailabilityPercentage(
-                        pool.instances[0].capacity.available, pool.instances[0].capacity.total
-                      )}%`,
-                    }}
-                  >
-                    {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
-                  </div>
-                </div>
-              </td>
-              <td className={tablestyles.td}>
-                <input
-                  type="checkbox"
-                  checked={selectedPools.includes(pool)}
-                  onChange={() => togglePoolSelection(pool)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <button onClick={() => setShowDialog(true)} className={tablestyles.showSelectedButton}>
-        Show Selected Pools
-      </button>
-      {showDialog && (
-        <div className={dialogStyles.overlay}>
-          <div className={dialogStyles.dialog}>
-            <h2>Selected Pools</h2>
-            <ul className={tablestyles.selectedPools}>
-              {selectedPools.map((pool) => (
-                <li key={pool.pool}>{pool.pool}</li>
-              ))}
-            </ul>
-            <button onClick={handleConfirm} className={dialogStyles.continueButton}>
-              Yes
-            </button>
-            <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>
-              No
-            </button>
-          </div>
-        </div>
-      )}
-      {confirmedPools.length > 0 && (
-        <div>
-          <h2>Confirmed Pools</h2>
-          <ul>
-            {confirmedPools.map((pool) => (
-              <li key={pool.pool}>{pool.pool}</li>
-            ))}
-          </ul>
-          <button
-            className={dialogStyles.migrateButton}
-            disabled={confirmedPools.length === 0}
-          >
-            Migrate
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default PoolTable;
-
 import { style, styleVariants } from '@vanilla-extract/css';
 
 export const tablestyles = {
@@ -230,8 +32,8 @@ export const tablestyles = {
   }),
   tr: style({
     ':hover': {
-      backgroundColor: '#d3d3d3', // Light grey background on hover
-      color: '#0000ff', // Blue text color on hover
+      backgroundColor: '#ffffff', // White background on hover
+      color: '#000000', // Black text color on hover
     },
   }),
   showSelectedButton: style({
@@ -250,6 +52,23 @@ export const tablestyles = {
   selectedPools: style({
     listStyleType: 'none',
     paddingLeft: 0,
+  }),
+  confirmedPools: style({
+    listStyleType: 'none',
+    paddingLeft: 0,
+  }),
+  deleteButton: style({
+    marginLeft: '10px',
+    padding: '5px 10px',
+    backgroundColor: '#f44336',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    ':hover': {
+      backgroundColor: '#da2f2f',
+    },
   }),
   utilizationBarContainer: style({
     backgroundColor: '#e1e1e1',
@@ -346,3 +165,209 @@ export const dialogStyles = {
 };
 
 
+function formatNextRepave(nextRepave: string): string {
+  if (!nextRepave) return 'N/A';
+  const nextRepave2 = nextRepave.substring(0, 10);
+  return nextRepave2;
+}
+
+const PoolTable: React.FC = () => {
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
+  const [confirmedPools, setConfirmedPools] = useState<Pool[]>([]);
+  const [sortKey, setSortKey] = useState<string | null>('availability');
+  const [sortDesc, setSortDesc] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showDialog, setShowDialog] = useState<boolean>(false);
+
+  useEffect(() => {
+    getFilteredPoolInfo()
+      .then((response) => {
+        setPools(response.data);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        setError('Failed to fetch pool data');
+        setIsLoading(false);
+      });
+  }, []);
+
+  const handleConfirm = () => {
+    setConfirmedPools(selectedPools);
+    setSelectedPools([]);
+  };
+
+  const handleDeleteConfirmedPool = (pool: Pool) => {
+    setConfirmedPools((prev) => prev.filter((p) => p !== pool));
+  };
+
+  const togglePoolSelection = (pool: Pool) => {
+    setSelectedPools((prev) =>
+      prev.includes(pool) ? prev.filter((p) => p !== pool) : [...prev, pool]
+    );
+  };
+
+  const getAvailabilityPercentage = (available: number, total: number): number => {
+    if (total === 0) return 0;
+    return Math.round((available / total) * 100);
+  };
+
+  const sortByAvgCpu = () => {
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = a.avgCpu;
+      const bValue = b.avgCpu;
+      return sortDesc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('avgCpu');
+    setSortDesc(!sortDesc);
+  };
+
+  const sortByMaxSlice = () => {
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = a.instances[0].capacity.maxSlice;
+      const bValue = b.instances[0].capacity.maxSlice;
+      return sortDesc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('maxSlice');
+    setSortDesc(!sortDesc);
+  };
+
+  const sortByAvailability = () => {
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = getAvailabilityPercentage(a.instances[0].capacity.available, a.instances[0].capacity.total);
+      const bValue = getAvailabilityPercentage(b.instances[0].capacity.available, b.instances[0].capacity.total);
+      return sortDesc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('availability');
+    setSortDesc(!sortDesc);
+  };
+
+  const getUtilizationBarClass = (percentage: number) => {
+    if (percentage > 70) return utilizationBarVariants.high;
+    if (percentage > 50) return utilizationBarVariants.medium;
+    return utilizationBarVariants.low;
+  };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>{error}</div>;
+
+  return (
+    <div className={tablestyles.container}>
+      <h1>Latest Pool Information</h1>
+      <table className={tablestyles.table}>
+        <thead>
+          <tr>
+            <th className={tablestyles.th}>Region</th>
+            <th className={tablestyles.th}>Pool</th>
+            <th className={tablestyles.th}>
+              Avg CPU
+              <button onClick={sortByAvgCpu}>{sortKey === 'avgCpu' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
+            </th>
+            <th className={tablestyles.th}>
+              Max Slice
+              <button onClick={sortByMaxSlice}>{sortKey === 'maxSlice' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
+            </th>
+            <th className={tablestyles.th}>
+              Availability
+              <button onClick={sortByAvailability}>{sortKey === 'availability' ? (sortDesc ? ' ↓' : ' ↑') : ''}</button>
+            </th>
+            <th className={tablestyles.th}>Select</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pools.map((pool) => (
+            <tr key={pool.pool} className={tablestyles.tr}>
+              <td className={tablestyles.td}>{pool.region}</td>
+              <td className={tablestyles.td}>{pool.pool}</td>
+              <td className={tablestyles.td}>
+                <div className={tablestyles.utilizationBarContainer}>
+                  <div
+                    className={`${tablestyles.utilizationBar} ${getUtilizationBarClass(pool.avgCpu)}`}
+                    style={{ width: `${pool.avgCpu}%` }}
+                  >
+                    {roundCpu(pool.avgCpu)}
+                  </div>
+                </div>
+              </td>
+              <td className={tablestyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
+              <td className={tablestyles.td}>
+                <div className={tablestyles.utilizationBarContainer}>
+                  <div
+                    className={`${tablestyles.utilizationBar} ${getUtilizationBarClass(
+                      getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)
+                    )}`}
+                    style={{
+                      width: `${getAvailabilityPercentage(
+                        pool.instances[0].capacity.available, pool.instances[0].capacity.total
+                      )}%`,
+                    }}
+                  >
+                    {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
+                  </div>
+                </div>
+              </td>
+              <td className={tablestyles.td}>
+                <input
+                  type="checkbox"
+                  checked={selectedPools.includes(pool)}
+                  onChange={() => togglePoolSelection(pool)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button onClick={() => setShowDialog(true)} className={tablestyles.showSelectedButton}>
+        Show Selected Pools
+      </button>
+      {showDialog && (
+        <div className={dialogStyles.overlay}>
+          <div className={dialogStyles.dialog}>
+            <h2>Selected Pools</h2>
+            <ul className={tablestyles.selectedPools}>
+              {selectedPools.map((pool) => (
+                <li key={pool.pool}>{pool.pool}</li>
+              ))}
+            </ul>
+            <button onClick={handleConfirm} className={dialogStyles.continueButton}>
+              Yes
+            </button>
+            <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>
+              No
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmedPools.length > 0 && (
+        <div>
+          <h2>Confirmed Pools</h2>
+          <ul className={tablestyles.confirmedPools}>
+            {confirmedPools.map((pool) => (
+              <li key={pool.pool}>
+                {pool.pool}
+                <button
+                  onClick={() => handleDeleteConfirmedPool(pool)}
+                  className={tablestyles.deleteButton}
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            className={dialogStyles.migrateButton}
+            disabled={confirmedPools.length === 0}
+          >
+            Migrate
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PoolTable;
