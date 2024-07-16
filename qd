@@ -1,3 +1,6 @@
+
+
+
 function formatNextRepave(nextRepave: string): string {
   if (!nextRepave) return 'N/A';
   const nextRepave2 = nextRepave.substring(0, 10);
@@ -76,8 +79,8 @@ const PoolTable: React.FC = () => {
   };
 
   const getUtilizationBarClass = (percentage: number) => {
-    if (percentage > 70) return utilizationBarVariants.high;
-    if (percentage > 50) return utilizationBarVariants.medium;
+    if (percentage < 50) return utilizationBarVariants.high;
+    if (percentage < 70) return utilizationBarVariants.medium;
     return utilizationBarVariants.low;
   };
 
@@ -112,20 +115,31 @@ const PoolTable: React.FC = () => {
             <tr key={pool.pool} className={tablestyles.tr}>
               <td className={tablestyles.td}>{pool.region}</td>
               <td className={tablestyles.td}>{pool.pool}</td>
-              <td className={tablestyles.td}>{roundCpu(pool.avgCpu)}</td>
+              <td className={tablestyles.td}>
+                <div className={tablestyles.utilizationBarContainer}>
+                  <div
+                    className={`${tablestyles.utilizationBar} ${getUtilizationBarClass(pool.avgCpu)}`}
+                    style={{ width: `${pool.avgCpu}%` }}
+                  >
+                    {roundCpu(pool.avgCpu)}
+                  </div>
+                </div>
+              </td>
               <td className={tablestyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
               <td className={tablestyles.td}>
-                <div
-                  className={getUtilizationBarClass(
-                    getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)
-                  )}
-                  style={{
-                    width: `${getAvailabilityPercentage(
-                      pool.instances[0].capacity.available, pool.instances[0].capacity.total
-                    )}%`
-                  }}
-                >
-                  {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
+                <div className={tablestyles.utilizationBarContainer}>
+                  <div
+                    className={`${tablestyles.utilizationBar} ${getUtilizationBarClass(
+                      getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)
+                    )}`}
+                    style={{
+                      width: `${getAvailabilityPercentage(
+                        pool.instances[0].capacity.available, pool.instances[0].capacity.total
+                      )}%`,
+                    }}
+                  >
+                    {computeAvailability(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}
+                  </div>
                 </div>
               </td>
               <td className={tablestyles.td}>
@@ -182,7 +196,6 @@ const PoolTable: React.FC = () => {
 
 export default PoolTable;
 
-
 import { style, styleVariants } from '@vanilla-extract/css';
 
 export const tablestyles = {
@@ -238,17 +251,31 @@ export const tablestyles = {
     listStyleType: 'none',
     paddingLeft: 0,
   }),
+  utilizationBarContainer: style({
+    backgroundColor: '#e1e1e1',
+    borderRadius: '5px',
+    overflow: 'hidden',
+    position: 'relative',
+    height: '20px',
+  }),
+  utilizationBar: style({
+    height: '100%',
+    borderRadius: '5px',
+    textAlign: 'center',
+    lineHeight: '20px',
+    color: 'white',
+  }),
 };
 
 export const utilizationBarVariants = styleVariants({
   low: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#4CAF50', // Green
   },
   medium: {
-    backgroundColor: '#FFC107',
+    backgroundColor: '#FFC107', // Yellow
   },
   high: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#F44336', // Red
   },
 });
 
@@ -317,3 +344,5 @@ export const dialogStyles = {
     },
   }),
 };
+
+
