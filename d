@@ -239,9 +239,10 @@ const PoolTable: React.FC = (): Element => {
 };
 
 export default PoolTable;
-Updated CSS (tableStyles.css.ts)
-typescript
-Copy code
+
+
+
+  
 import { style } from 'typestyle';
 
 export const tableStyles = {
@@ -302,7 +303,6 @@ export const tableStyles = {
     borderRadius: '5px',
     cursor: 'pointer',
     fontSize: '16px',
-    $nest: {
       '&:hover': {
         backgroundColor: '#45a049',
       },
@@ -331,7 +331,6 @@ export const tableStyles = {
     borderRadius: '5px',
     cursor: 'pointer',
     fontSize: '14px',
-    $nest: {
       '&:hover': {
         backgroundColor: '#d32f2f',
       },
@@ -339,7 +338,6 @@ export const tableStyles = {
   }),
   tableRow: style({
     transition: 'background-color 0.3s',
-    $nest: {
       '&:hover': {
         backgroundColor: '#f5f5f5', // Or any other color that suits your design
       },
@@ -384,7 +382,6 @@ export const dialogStyles = {
     borderRadius: '5px',
     cursor: 'pointer',
     fontSize: '16px',
-    $nest: {
       '&:hover': {
         backgroundColor: '#45a049',
       },
@@ -398,7 +395,6 @@ export const dialogStyles = {
     borderRadius: '5px',
     cursor: 'pointer',
     fontSize: '16px',
-    $nest: {
       '&:hover': {
         backgroundColor: '#d32f2f',
       },
@@ -413,7 +409,6 @@ export const dialogStyles = {
     borderRadius: '5px',
     cursor: 'pointer',
     fontSize: '16px',
-    $nest: {
       '&:hover': {
         backgroundColor: '#1976D2',
       },
