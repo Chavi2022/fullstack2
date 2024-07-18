@@ -12,5 +12,5 @@ const sortByAvailability = () => {
 
 const getAvailabilityPercentage = (available: number, total: number): number => {
   if (total === 0) return 0;
-  return Math.round((total - available) / total * 100);
+  return Math.round((available / total) * 100);
 };
