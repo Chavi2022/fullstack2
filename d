@@ -1,11 +1,176 @@
+import { tableStyles, utilizationBarVariants, dialogStyles } from './tableStyles.css';
+
+function formatNextRepave(nextRepave: string): string {
+  if (!nextRepave) return 'N/A';
+  return nextRepave.substring(0, 10);
+}
+
+interface LinkAll {
+  onClick: (event: React.MouseEvent<HTMLFormElement>) => void;
+}
+
+const PoolTable: React.FC = () => {
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
+  const [sortKey, setSortKey] = useState<'avgCpu' | 'availability' | 'maxSlice' | null>(null);
+  const [sortDesc, setSortDesc] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showDialog, setShowDialog] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    getFilteredPoolInfo()
+      .then((response) => {
+        setPools(response.data);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError('Failed to fetch pool data');
+        setIsLoading(false);
+      });
+  }, []);
+
+  const sortByAvgCpu = () => {
+    const desc = sortKey === 'avgCpu' ? !sortDesc : true;
+    const sortedPools = [...pools].sort((a, b) => desc ? b.avgCpu - a.avgCpu : a.avgCpu - b.avgCpu);
+    setPools(sortedPools);
+    setSortKey('avgCpu');
+    setSortDesc(desc);
+  };
+
+  const sortByAvailability = () => {
+    const desc = sortKey === 'availability' ? !sortDesc : true;
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = a.instances[0]?.capacity.available ?? 0;
+      const bValue = b.instances[0]?.capacity.available ?? 0;
+      return desc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('availability');
+    setSortDesc(desc);
+  };
+
+  const sortByMaxSlice = () => {
+    const desc = sortKey === 'maxSlice' ? !sortDesc : true;
+    const sortedPools = [...pools].sort((a, b) => {
+      const aValue = a.instances[0].capacity.maxSlice ?? 0;
+      const bValue = b.instances[0].capacity.maxSlice ?? 0;
+      return desc ? bValue - aValue : aValue - bValue;
+    });
+    setPools(sortedPools);
+    setSortKey('maxSlice');
+    setSortDesc(desc);
+  };
+
+  const togglePoolSelection = (pool: Pool) => {
+    setSelectedPools((prev) =>
+      prev.includes(pool) ? prev.filter((p) => p !== pool) : [...prev, pool]
+    );
+  };
+
+  const getAvailabilityPercentage = (available: number, total: number): number => {
+    if (total === 0) return 0;
+    return Math.round((total - available) / total) * 100;
+  };
+
+  const handleContinue = () => {
+    setShowDialog(false);
+  };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div className={tableStyles.container}>
+      <h1>Latest Pool Information</h1>
+      <h2>Select Pools to migrate To/ho</h2>
+      <table className={tableStyles.table}>
+        <thead>
+          <tr>
+            <th className={tableStyles.th}>Region</th>
+            <th className={tableStyles.th}>Avg CPU</th>
+            <th className={tableStyles.th}>
+              <button onClick={sortByAvgCpu} className={tableStyles.sortButton}>
+                Avg CPU {sortKey === 'avgCpu' ? (sortDesc ? '▼' : '▲') : ''}
+              </button>
+            </th>
+            <th className={tableStyles.th}>
+              <button onClick={sortByMaxSlice} className={tableStyles.sortButton}>
+                Max Slice {sortKey === 'maxSlice' ? (sortDesc ? '▼' : '▲') : ''}
+              </button>
+            </th>
+            <th className={tableStyles.th}>
+              <button onClick={sortByAvailability} className={tableStyles.sortButton}>
+                Availability {sortKey === 'availability' ? (sortDesc ? '▼' : '▲') : ''}
+              </button>
+            </th>
+            <th className={tableStyles.th}>Select</th>
+            <th className={tableStyles.th}>Next Repave</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pools.map((pool) => (
+            <tr key={pool.pool} className={tableStyles.row}>
+              <td className={tableStyles.td}>{pool.region}</td>
+              <td className={tableStyles.td}>{roundCpu(pool.avgCpu)}</td>
+              <td className={tableStyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
+              <td className={tableStyles.td}>{computeAvailability(pool.instances[0].capacity.available)}</td>
+              <td className={tableStyles.td}>
+                <input
+                  type="checkbox"
+                  checked={selectedPools.includes(pool)}
+                  onChange={() => togglePoolSelection(pool)}
+                />
+              </td>
+              <td className={tableStyles.td}>{formatNextRepave(pool.instances[0].nextRepave)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        onClick={() => setShowDialog(true)}
+        className={tableStyles.showSelectedButton}
+        disabled={selectedPools.length === 0}
+      >
+        Show Selected Pools
+      </button>
+
+      {showDialog && (
+        <div className={dialogStyles.overlay}>
+          <div className={dialogStyles.dialog}>
+            <h2>Selected Pools</h2>
+            <ul>
+              {selectedPools.map((pool) => (
+                <li key={pool.pool}>{pool.pool}</li>
+              ))}
+            </ul>
+            <button onClick={handleContinue} className={dialogStyles.continueButton}>
+              Continue
+            </button>
+            <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PoolTable;
+
+
+
 import { style, styleVariants } from '@vanilla-extract/css';
 
-export const tablestyles = {
+export const tableStyles = {
   container: style({
     width: '100%',
     maxWidth: '1600px',
     margin: '2rem auto',
-    backgroundColor: '#e1e1e1',
+    backgroundColor: '#1e1e1e',
     borderRadius: '8px',
     overflow: 'hidden',
     fontFamily: 'Arial, sans-serif',
@@ -29,16 +194,36 @@ export const tablestyles = {
     color: '#ffffff',
     fontSize: '14px',
     textAlign: 'center',
-  }),
-  tr: style({
+    position: 'relative',
+    transition: 'background-color 0.3s, color 0.3s',
     ':hover': {
-      backgroundColor: '#ffffff', // White background on hover
-      color: '#000000', // Black text color on hover
+      backgroundColor: '#ffffff',
+      color: '#212121',
     },
+  }),
+  utilization: style({
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#3a3a3a',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    height: '16px',
+    width: '100%',
+    position: 'relative',
+  }),
+  utilizationBar: style({
+    height: '100%',
+    borderRadius: '4px',
+    position: 'absolute',
+  }),
+  utilizationText: style({
+    marginLeft: '8px',
+    position: 'relative',
+    zIndex: 1,
   }),
   showSelectedButton: style({
     marginTop: '20px',
-    padding: '12px 20px',
+    padding: '10px 20px',
     backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
@@ -48,54 +233,51 @@ export const tablestyles = {
     ':hover': {
       backgroundColor: '#45a049',
     },
+    ':disabled': {
+      backgroundColor: '#cccccc',
+      cursor: 'not-allowed',
+    },
   }),
-  selectedPools: style({
-    listStyleType: 'none',
-    paddingLeft: 0,
-  }),
-  confirmedPools: style({
-    listStyleType: 'none',
-    paddingLeft: 0,
-  }),
-  deleteButton: style({
-    marginLeft: '10px',
-    padding: '5px 10px',
-    backgroundColor: '#f44336',
+  migrateButton: style({
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: '#2196F3',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '16px',
     ':hover': {
-      backgroundColor: '#da2f2f',
+      backgroundColor: '#1976D2',
     },
   }),
-  utilizationBarContainer: style({
-    backgroundColor: '#e1e1e1',
-    borderRadius: '5px',
-    overflow: 'hidden',
-    position: 'relative',
-    height: '20px',
+  listStyleNone: style({
+    paddingLeft: '0', // Remove padding left to get rid of bullet point space
+    listStyleType: 'none',
   }),
-  utilizationBar: style({
-    height: '100%',
-    borderRadius: '5px',
-    textAlign: 'center',
-    lineHeight: '20px',
-    color: 'white',
+  sortButton: style({
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    color: '#ffffff',
+    padding: '0',
+    display: 'flex',
+    alignItems: 'center',
+    ':hover': {
+      color: '#4CAF50',
+    },
+    '::after': {
+      content: '""',
+      marginLeft: '4px',
+    },
   }),
 };
 
 export const utilizationBarVariants = styleVariants({
-  low: {
-    backgroundColor: '#4CAF50', // Green
-  },
-  medium: {
-    backgroundColor: '#FFC107', // Yellow
-  },
-  high: {
-    backgroundColor: '#F44336', // Red
-  },
+  low: { backgroundColor: '#4CAF50' },
+  medium: { backgroundColor: '#ffeb3b' },
+  high: { backgroundColor: '#f57224' },
 });
 
 export const dialogStyles = {
@@ -115,7 +297,7 @@ export const dialogStyles = {
     backgroundColor: '#2a2a2a',
     padding: '20px',
     borderRadius: '8px',
-    maxWidth: '580px',
+    maxWidth: '500px',
     width: '100%',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
     color: '#ffffff',
@@ -142,7 +324,7 @@ export const dialogStyles = {
     cursor: 'pointer',
     fontSize: '16px',
     ':hover': {
-      backgroundColor: '#da2f2f',
+      backgroundColor: '#d32f2f',
     },
   }),
   migrateButton: style({
@@ -156,10 +338,6 @@ export const dialogStyles = {
     fontSize: '16px',
     ':hover': {
       backgroundColor: '#1976D2',
-    },
-    ':disabled': {
-      backgroundColor: '#c0c0c0',
-      cursor: 'not-allowed',
     },
   }),
 };
