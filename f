@@ -1,8 +1,37 @@
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-const PoolTable = () => {
+interface ApiContextProps {
+    apiLinks: { [key: string]: string };
+    setApiLinks: (links: { [key: string]: string }) => void;
+}
+
+const ApiContext = createContext<ApiContextProps | undefined>(undefined);
+
+export const useApiContext = () => {
+    const context = useContext(ApiContext);
+    if (!context) {
+        throw new Error('useApiContext must be used within an ApiProvider');
+    }
+    return context;
+};
+
+export const ApiProvider = ({ children }: { children: ReactNode }) => {
+
+
+
+
+
+interface PoolTableProps {}
+
+const formatNextRepave = (nextRepave?: string): string => {
+    if (!nextRepave) return 'N/A';
+    return nextRepave.substring(0, 10);
+};
+
+const PoolTable: React.FC<PoolTableProps> = () => {
+    const { apiLinks, setApiLinks } = useApiContext();
     const [pools, setPools] = useState<Pool[]>([]);
     const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
-    const { setSelectedPoolNames, setApiLink } = useSelectedPools();
     const [sortKey, setSortKey] = useState<'avgCpu' | 'availability' | 'maxSlice' | 'region' | 'pool' | 'nextRepave'>('avgCpu');
     const [sortDesc, setSortDesc] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
@@ -11,31 +40,32 @@ const PoolTable = () => {
     const [showMigrate, setShowMigrate] = useState(false);
     const [migrationData, setMigrationData] = useState<string[]>([]);
 
-    const fetchApiLink = async (selectedPools) => {
-        try {
-            const response = await axios.post('/api/getApiLink', { pools: selectedPools });
-            setApiLink(response.data.apiLink);
-        } catch (error) {
-            console.error('Failed to fetch apiLink', error);
-        }
-    };
+    useEffect(() => {
+        getFilteredPoolInfo()
+            .then(response => {
+                const data = response.data;
+                setPools(data);
 
-    const handleMigrate = async () => {
-        const poolNames = selectedPools.map(pool => pool.pool);
-        setSelectedPoolNames(poolNames);
-        console.log('Selected Pools for Migration:', poolNames);
+                // Set the API links
+                const links = data.reduce((acc: { [key: string]: string }, pool: Pool) => {
+                    acc[pool.pool] = pool.instances[0].api;
+                    return acc;
+                }, {});
+                setApiLinks(links);
+                setIsLoading(false);
+            })
+            .catch(err => {
+                console.error('Failed to fetch pool data', err);
+                setError('Failed to fetch pool data');
+                setIsLoading(false);
+            });
+    }, [setApiLinks]);
 
-        // Fetch the apiLink based on selected pools
-        await fetchApiLink(selectedPools);
-
-        setShowMigrate(true);
-        setMigrationData(poolNames);
-    };
-
-    const handleSort = (key) => {
+    const handleSort = (key: 'avgCpu' | 'availability' | 'maxSlice' | 'region' | 'pool' | 'nextRepave') => {
         const desc = sortKey === key ? !sortDesc : true;
         const sortedPools = [...pools].sort((a, b) => {
-            let aValue, bValue;
+            let aValue: any;
+            let bValue: any;
 
             switch (key) {
                 case 'availability':
@@ -77,34 +107,28 @@ const PoolTable = () => {
         setSortDesc(desc);
     };
 
-    useEffect(() => {
-        setIsLoading(true);
-        getFilteredPoolInfo()
-            .then(response => {
-                setPools(response.data);
-                setIsLoading(false);
-            })
-            .catch(error => {
-                console.error('Failed to fetch pool data', error);
-                setError('Failed to fetch pool data');
-                setIsLoading(false);
-            });
-    }, []);
+    const handleMigrate = () => {
+        selectedPools.forEach(pool => {
+            const apiLink = apiLinks[pool.pool];
+            console.log('API Link:', apiLink); // Use the API link as needed
+            // Perform the migration using the apiLink
+        });
+    };
 
     const togglePoolSelection = (pool: Pool) => {
-        setSelectedPools(prev => prev.includes(pool) ? prev.filter(p => p !== pool) : [...prev, pool]);
+        setSelectedPools(prev =>
+            prev.includes(pool) ? prev.filter(p => p !== pool) : [...prev, pool]
+        );
     };
 
-    const handleContinue = () => {
-        setShowDialog(false);
-        setShowMigrate(true);
-    };
+    if (isLoading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error}</div>;
 
     return (
         <div className={tableStyles.container}>
             <Entries />
             <h1>Strategic Migration Pools</h1>
-            <h6 className="green">Choose Pools to Migrate To</h6>
+            <h6>Choose Pools to Migrate To</h6>
             <table className={tableStyles.table}>
                 <thead>
                     <tr>
@@ -146,31 +170,45 @@ const PoolTable = () => {
                         <tr key={pool.pool}>
                             <td className={tableStyles.td}>{pool.region}</td>
                             <td className={tableStyles.td}>{pool.pool}</td>
-                            <td className={tableStyles.td}>{pool.instances[0]?.nextRepave ? pool.instances[0].nextRepave.substring(0, 10) : 'N/A'}</td>
+                            <td className={tableStyles.td}>{formatNextRepave(pool.instances[0].nextRepave)}</td>
+                            <td className={tableStyles.td}>{pool.avgCpu}</td>
                             <td className={tableStyles.td}>
                                 <div className={tableStyles.utilization}>
                                     <div
-                                        className={tableStyles.utilizationBar + ' ' +
-                                            utilizationBarVariants[getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 70 ? 'high' :
-                                                getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 50 ? 'medium' : 'low']}
-                                        style={{ width: `${getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%` }}>
-                                    </div>
+                                        className={
+                                            tableStyles.utilizationBar +
+                                            ' ' +
+                                            utilizationBarVariants[
+                                                getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 70
+                                                    ? 'high'
+                                                    : getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total) > 50
+                                                    ? 'medium'
+                                                    : 'low'
+                                            ]
+                                        }
+                                        style={{
+                                            width: `${getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%`,
+                                        }}
+                                    />
                                     <span className={tableStyles.utilizationText}>
                                         {getAvailabilityPercentage(pool.instances[0].capacity.available, pool.instances[0].capacity.total)}%
                                     </span>
                                 </div>
                             </td>
-                            <td className={tableStyles.td}>{roundCpu(pool.avgCpu)}</td>
-                            <td className={tableStyles.td}>{formatSlice(pool.instances[0].capacity.maxSlice)}</td>
+                            <td className={tableStyles.td}>{pool.instances[0].capacity.maxSlice}</td>
                             <td className={tableStyles.td}>
-                                <input type="checkbox" checked={selectedPools.includes(pool)} onChange={() => togglePoolSelection(pool)} />
+                                <input
+                                    type="checkbox"
+                                    checked={selectedPools.includes(pool)}
+                                    onChange={() => togglePoolSelection(pool)}
+                                />
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
-            <button onClick={() => setShowDialog(true)} className={tableStyles.showSelectedButton} disabled={selectedPools.length === 0}>
-                Pools Chosen To Migrate
+            <button onClick={handleMigrate} className={dialogStyles.migrateButton}>
+                Migrate App To Pool(s)
             </button>
             {showDialog && (
                 <div className={dialogStyles.overlay}>
@@ -181,62 +219,22 @@ const PoolTable = () => {
                                 <li key={index}>{pool.pool}</li>
                             ))}
                         </ul>
-                        <button onClick={handleContinue} className={dialogStyles.continueButton}>Yes</button>
-                        <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>No</button>
+                        <button onClick={handleMigrate} className={dialogStyles.continueButton}>
+                            Yes
+                        </button>
+                        <button onClick={() => setShowDialog(false)} className={dialogStyles.closeButton}>
+                            No
+                        </button>
                     </div>
                 </div>
             )}
-            {showMigrate && (
-                <div className={dialogStyles.migrateSection}>
-                    <h2>Selected Pools for Migration</h2>
-                    <ul className={tableStyles.selectedPools}>
-                        {selectedPools.map((pool, index) => (
-                            <li key={index}>{pool.pool}</li>
-                        ))}
-                    </ul>
-                    <button onClick={handleMigrate} className={dialogStyles.migrateButton}>
-                        Migrate App To Pool(s)
-                    </button>
-                </div>
-            )}
-            {showMigrate && <ServicesAndAppsPage poolNames={migrationData} />}
         </div>
     );
-};
 
-const getAvailabilityPercentage = (available, total) => {
-    if (total === 0) return 0;
-    return Math.round((available / total) * 100);
+    function getAvailabilityPercentage(available: number, total: number): number {
+        if (total === 0) return 0;
+        return Math.round((available / total) * 100);
+    }
 };
 
 export default PoolTable;
-
-
-
-import React, { useContext } from 'react';
-import { SelectedPoolsContext } from './SelectedPoolsContext';
-
-const ServicesAndAppsPage = ({ poolNames }) => {
-    const { apiLink } = useContext(SelectedPoolsContext);
-
-    return (
-        <div className="background">
-            <h1>Creating Services In New Pools</h1>
-            <h2>Installing your services...</h2>
-            <ul>
-                {poolNames.map((poolName, index) => (
-                    <li key={index}>Service Name Created in "{poolName}"....in progress</li>
-                ))}
-            </ul>
-            <h2>Creating Your Apps In New Pools</h2>
-            <p>Creating Your Apps...</p>
-            <ul>
-                {poolNames.map((poolName, index) => (
-                    <li key={index}>App name Created in "{poolName}"....in progress</li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-export default ServicesAndAppsPage;
