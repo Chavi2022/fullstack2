@@ -1,34 +1,15 @@
-import React, { createContext, useContext, useState } from 'react';
-
-const SelectedPoolsContext = createContext();
-
-export const SelectedPoolsProvider = ({ children }) => {
-    const [selectedPoolNames, setSelectedPoolNames] = useState([]);
-    const [apiLink, setApiLink] = useState('');
-
-    return (
-        <SelectedPoolsContext.Provider value={{ selectedPoolNames, setSelectedPoolNames, apiLink, setApiLink }}>
-            {children}
-        </SelectedPoolsContext.Provider>
-    );
-};
-
-export const useSelectedPools = () => useContext(SelectedPoolsContext);
-
-
-
 
 const PoolTable = () => {
-    const [pools, setPools] = useState([]);
-    const [selectedPools, setSelectedPools] = useState([]);
+    const [pools, setPools] = useState<Pool[]>([]);
+    const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
     const { setSelectedPoolNames, setApiLink } = useSelectedPools();
-    const [sortKey, setSortKey] = useState('');
+    const [sortKey, setSortKey] = useState<'avgCpu' | 'availability' | 'maxSlice' | 'region' | 'pool' | 'nextRepave'>('avgCpu');
     const [sortDesc, setSortDesc] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
     const [showDialog, setShowDialog] = useState(false);
     const [showMigrate, setShowMigrate] = useState(false);
-    const [migrationData, setMigrationData] = useState([]);
+    const [migrationData, setMigrationData] = useState<string[]>([]);
 
     const fetchApiLink = async (selectedPools) => {
         try {
@@ -43,6 +24,8 @@ const PoolTable = () => {
         const poolNames = selectedPools.map(pool => pool.pool);
         setSelectedPoolNames(poolNames);
         console.log('Selected Pools for Migration:', poolNames);
+
+        // Fetch the apiLink based on selected pools
         await fetchApiLink(selectedPools);
 
         setShowMigrate(true);
@@ -96,7 +79,7 @@ const PoolTable = () => {
 
     useEffect(() => {
         setIsLoading(true);
-        axios.get('/api/getPools')
+        getFilteredPoolInfo()
             .then(response => {
                 setPools(response.data);
                 setIsLoading(false);
@@ -108,7 +91,7 @@ const PoolTable = () => {
             });
     }, []);
 
-    const togglePoolSelection = (pool) => {
+    const togglePoolSelection = (pool: Pool) => {
         setSelectedPools(prev => prev.includes(pool) ? prev.filter(p => p !== pool) : [...prev, pool]);
     };
 
@@ -119,6 +102,7 @@ const PoolTable = () => {
 
     return (
         <div className={tableStyles.container}>
+            <Entries />
             <h1>Strategic Migration Pools</h1>
             <h6 className="green">Choose Pools to Migrate To</h6>
             <table className={tableStyles.table}>
@@ -162,7 +146,7 @@ const PoolTable = () => {
                         <tr key={pool.pool}>
                             <td className={tableStyles.td}>{pool.region}</td>
                             <td className={tableStyles.td}>{pool.pool}</td>
-                            <td className={tableStyles.td}>{pool.instances[0]?.nextRepave ? formatNextRepave(pool.instances[0].nextRepave) : 'N/A'}</td>
+                            <td className={tableStyles.td}>{pool.instances[0]?.nextRepave ? pool.instances[0].nextRepave.substring(0, 10) : 'N/A'}</td>
                             <td className={tableStyles.td}>
                                 <div className={tableStyles.utilization}>
                                     <div
@@ -219,15 +203,6 @@ const PoolTable = () => {
         </div>
     );
 };
-
-const formatNextRepave = (nextRepave) => {
-    if (!nextRepave) return 'N/A';
-    return nextRepave.substring(0, 10);
-};
-
-const roundCpu = (avgCpu) => Math.round(avgCpu);
-
-const formatSlice = (maxSlice) => maxSlice;
 
 const getAvailabilityPercentage = (available, total) => {
     if (total === 0) return 0;
