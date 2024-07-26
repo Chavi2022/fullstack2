@@ -7,48 +7,30 @@ export const container = style({
   padding: "20px",
   margin: "50px auto",
   borderRadius: "10px",
-  textAlign: "center",
   color: "#fff",
   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-});
-
-export const inputStyles = style({
-  width: "60%",
-  padding: "10px",
-  margin: "10px 0",
-  borderRadius: "5px",
-  border: "1px solid #ccc",
-  fontSize: "16px",
-  color: "#212121",
-  boxSizing: "border-box",
 });
 
 export const formStyles = style({
   display: "flex",
   flexDirection: "column",
-  alignItems: "flex-start",
-  gap: "10px",
+  gap: "20px",
 });
 
 export const formGroup = style({
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
-  width: "100%",
 });
 
 export const labelStyles = style({
-  width: "30%",
+  flex: "1",
   textAlign: "right",
   marginRight: "10px",
-  fontSize: "16px",
-  color: "#fff",
 });
 
-export const dropdown = style({
-  width: "60%",
+export const inputStyles = style({
+  flex: "2",
   padding: "10px",
-  margin: "10px 0",
   borderRadius: "5px",
   border: "1px solid #ccc",
   fontSize: "16px",
@@ -56,8 +38,14 @@ export const dropdown = style({
   boxSizing: "border-box",
 });
 
-export const dropdownDiv = style({
-  width: "100%",
+export const dropdown = style({
+  flex: "2",
+  padding: "10px",
+  borderRadius: "5px",
+  border: "1px solid #ccc",
+  fontSize: "16px",
+  color: "#212121",
+  boxSizing: "border-box",
 });
 
 export const buttonStyles = style({
@@ -106,136 +94,6 @@ export const aestric = style({
   color: "red",
 });
 
-
-import React, { useState, useEffect } from 'react';
-import {
-  container,
-  buttonStyles,
-  formStyles,
-  inputStyles,
-  dropdown,
-  dropdownDiv,
-  listStyles,
-  sectionTitle,
-  visible,
-  invisible,
-  loading,
-  aestric,
-  formGroup,
-  labelStyles
-} from './Entries.css';
-import { getOldPools, getProjectList } from '../../services/BitBucketApiService';
-
-function Entries(): JSX.Element {
-  const [isVisible, setIsVisible] = useState(false);
-  const [dropdownVisible, setDropdownVisible] = useState(false);
-  const [appProjectKey, setAppProjectKey] = useState('');
-  const [serviceProjectKey, setServiceProjectKey] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [appNames, setAppNames] = useState<string[]>([]);
-  const [appName, setAppName] = useState('');
-  const [time, setTime] = useState(500);
-  const [oldPools, setOldPools] = useState<string[]>([]);
-
-  const Alert = () => {
-    setIsVisible(true);
-    setIsLoading(true);
-
-    getOldPools(appProjectKey, appName)
-      .then((response: { data: OldPool[] }) => {
-        setOldPools(response.data);
-        setIsLoading(false);
-      });
-  };
-
-  const populateDropdown = () => {
-    getProjectList(appProjectKey)
-      .then(response => {
-        setIsLoading(false);
-        setDropdownVisible(true);
-        let appArray = response.data.values;
-
-        const names: string[] = [];
-        Object.values(appArray).forEach((value, index: number) => {
-          names.push(value.name);
-        });
-        setAppNames(names);
-      })
-      .catch(err => {
-        alert("Please enter an app project key");
-        setError("Failed to fetch pool data");
-        setIsLoading(false);
-      });
-  };
-
-  return (
-    <div className={container}>
-      <form className={formStyles}>
-        <h2 className={sectionTitle}>App Information</h2>
-
-        <div className={formGroup}>
-          <label className={labelStyles}>
-            App Project Key <span className={aestric}>*</span>
-          </label>
-          <input
-            type="text"
-            className={inputStyles}
-            required
-            placeholder="Required"
-            onChange={(e) => setAppProjectKey(e.target.value)}
-          />
-        </div>
-
-        <div className={formGroup}>
-          <label className={labelStyles}>
-            Select an Application
-          </label>
-          <select
-            className={dropdown}
-            onChange={(e) => setAppName(e.target.value)}
-            required
-          >
-            <option>Select from applications</option>
-            {appNames.map((appName: string, index: number) => (
-              <option key={index} value={appName}>
-                {appName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={formGroup}>
-          <label className={labelStyles}>
-            Service Project Key
-          </label>
-          <input
-            type="text"
-            className={inputStyles}
-            placeholder="Optional"
-            onChange={(e) => setServiceProjectKey(e.target.value)}
-          />
-        </div>
-
-        <button onClick={Alert} className={buttonStyles}>Submit</button>
-      </form>
-
-      {isVisible && (
-        <div className={listStyles}>
-          <p>Identified the following pools</p>
-          <hr />
-          <ul>
-            {oldPools.map((poolName: string, index: number) => (
-              <li key={index}>{poolName}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default Entries;
 
 
 
